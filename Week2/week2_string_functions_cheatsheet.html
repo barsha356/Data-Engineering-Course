@@ -1,0 +1,1289 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PostgreSQL String Functions — Week 2 Cheat Sheet</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Instrument+Sans:wght@400;500;600&family=Lora:ital,wght@0,500;1,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:        #FAFAF8;
+    --surface:   #FFFFFF;
+    --surface2:  #F3F2EF;
+    --border:    #E8E6E1;
+    --border2:   #D1CEC7;
+    --text:      #18181B;
+    --muted:     #71717A;
+    --faint:     #A1A1AA;
+
+    --blue:      #1D4ED8;
+    --blue-bg:   #EFF6FF;
+    --blue-bd:   #BFDBFE;
+
+    --teal:      #0F766E;
+    --teal-bg:   #F0FDFA;
+    --teal-bd:   #99F6E4;
+
+    --amber:     #92400E;
+    --amber-bg:  #FFFBEB;
+    --amber-bd:  #FCD34D;
+
+    --red:       #991B1B;
+    --red-bg:    #FEF2F2;
+    --red-bd:    #FECACA;
+
+    --green:     #166534;
+    --green-bg:  #F0FDF4;
+    --green-bd:  #86EFAC;
+
+    --purple:    #5B21B6;
+    --purple-bg: #F5F3FF;
+    --purple-bd: #C4B5FD;
+
+    --coral:     #9A3412;
+    --coral-bg:  #FFF7ED;
+    --coral-bd:  #FDBA74;
+
+    --code-bg:   #1E1E2E;
+    --code-fg:   #CDD6F4;
+
+    --mono: 'JetBrains Mono', monospace;
+    --sans: 'Instrument Sans', sans-serif;
+    --serif: 'Lora', serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 14px;
+    line-height: 1.6;
+  }
+
+  /* ── HEADER ── */
+  .page-header {
+    background: var(--text);
+    color: #F4F4F5;
+    padding: 3rem 2.5rem 2.5rem;
+    border-bottom: 3px solid #3B82F6;
+  }
+  .header-eyebrow {
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.14em;
+    text-transform: uppercase; color: #71717A; margin-bottom: 0.6rem;
+  }
+  .header-title {
+    font-family: var(--serif); font-size: clamp(1.8rem, 4vw, 2.8rem);
+    font-weight: 500; line-height: 1.2; margin-bottom: 0.5rem;
+  }
+  .header-title em { font-style: italic; color: #60A5FA; }
+  .header-sub {
+    font-size: 13.5px; color: #A1A1AA; max-width: 520px; line-height: 1.65;
+  }
+  .header-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 1.25rem; }
+  .header-tag {
+    font-family: var(--mono); font-size: 10px; letter-spacing: 0.05em;
+    border: 1px solid #27272A; border-radius: 4px;
+    padding: 3px 8px; color: #52525B;
+  }
+
+  /* ── NAV TABS ── */
+  .sticky-nav {
+    position: sticky; top: 0; z-index: 50;
+    background: rgba(250,250,248,0.96);
+    backdrop-filter: blur(6px);
+    border-bottom: 1px solid var(--border);
+    padding: 0 2.5rem;
+    display: flex; gap: 0; overflow-x: auto;
+  }
+  .nav-tab {
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.05em;
+    text-transform: uppercase; padding: 0.7rem 1rem;
+    color: var(--muted); cursor: pointer; white-space: nowrap;
+    border: none; border-bottom: 2px solid transparent;
+    background: none; transition: color 0.12s, border-color 0.12s;
+  }
+  .nav-tab:hover { color: var(--text); }
+  .nav-tab.active { color: var(--text); border-bottom-color: #3B82F6; }
+
+  /* ── MAIN LAYOUT ── */
+  .main { max-width: 940px; margin: 0 auto; padding: 2.25rem 2rem 5rem; }
+
+  /* ── SECTION ── */
+  .section { margin-bottom: 3rem; }
+  .section-head {
+    display: flex; align-items: center; gap: 10px;
+    margin-bottom: 1.25rem; padding-bottom: 0.6rem;
+    border-bottom: 1px solid var(--border);
+  }
+  .section-icon {
+    width: 26px; height: 26px; border-radius: 5px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px; flex-shrink: 0;
+  }
+  .section-title { font-size: 15px; font-weight: 600; letter-spacing: -0.01em; }
+  .section-count {
+    font-family: var(--mono); font-size: 10px; color: var(--faint);
+    margin-left: auto;
+  }
+
+  /* ── FUNCTION CARD ── */
+  .fn-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 10px;
+  }
+  .fn-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+    transition: border-color 0.12s, box-shadow 0.12s;
+  }
+  .fn-card:hover {
+    border-color: var(--border2);
+    box-shadow: 0 1px 6px rgba(0,0,0,0.06);
+  }
+  .fn-header {
+    padding: 11px 14px 9px;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: flex-start; gap: 9px;
+    background: var(--surface2);
+  }
+  .fn-badge {
+    font-family: var(--mono); font-size: 9px; font-weight: 600;
+    padding: 2px 6px; border-radius: 3px; flex-shrink: 0; margin-top: 2px;
+    letter-spacing: 0.06em; text-transform: uppercase;
+  }
+  .fn-name {
+    font-family: var(--mono); font-size: 12.5px; font-weight: 500;
+    flex: 1; word-break: break-all; color: var(--text);
+  }
+  .fn-body { padding: 10px 14px 12px; }
+  .fn-desc { font-size: 12.5px; color: var(--muted); line-height: 1.6; margin-bottom: 10px; }
+
+  /* ── CODE BLOCK ── */
+  .code-block {
+    background: var(--code-bg);
+    color: var(--code-fg);
+    border-radius: 6px;
+    padding: 11px 13px;
+    font-family: var(--mono); font-size: 11.5px;
+    line-height: 1.85; margin-bottom: 10px;
+    overflow-x: auto; white-space: pre;
+    border: 1px solid #313244;
+    font-variant-ligatures: none;
+    font-feature-settings: "liga" 0, "calt" 0;
+  }
+  .kw  { color: #89DCEB; }
+  .fn  { color: #89B4FA; }
+  .st  { color: #A6E3A1; }
+  .cm  { color: #585B70; font-style: italic; }
+  .nm  { color: #FAB387; }
+  .id  { color: #CDD6F4; }
+  .op  { color: #CBA6F7; }
+  .out { color: #F9E2AF; font-weight: 500; }
+
+  /* ── RESULT PILL ── */
+  .result-row {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 11.5px; margin-top: 4px; flex-wrap: wrap;
+  }
+  .result-label {
+    font-family: var(--mono); font-size: 9px; letter-spacing: 0.08em;
+    text-transform: uppercase; color: var(--faint); flex-shrink: 0;
+  }
+  .result-val {
+    font-family: var(--mono); font-size: 11px; font-weight: 500;
+    background: var(--teal-bg); color: var(--teal);
+    border: 1px solid var(--teal-bd); border-radius: 3px;
+    padding: 1px 7px;
+  }
+  .result-val.amber { background: var(--amber-bg); color: var(--amber); border-color: var(--amber-bd); }
+  .result-val.red   { background: var(--red-bg);   color: var(--red);   border-color: var(--red-bd);   }
+  .result-val.blue  { background: var(--blue-bg);  color: var(--blue);  border-color: var(--blue-bd);  }
+  .result-val.green { background: var(--green-bg); color: var(--green); border-color: var(--green-bd); }
+
+  /* ── NOTE BOX ── */
+  .note-box {
+    border-radius: 5px; padding: 8px 11px; font-size: 12px;
+    line-height: 1.55; display: flex; gap: 7px; margin-top: 9px;
+  }
+  .note-box .note-icon { font-size: 13px; flex-shrink: 0; margin-top: 1px; }
+  .note-tip  { background: var(--blue-bg);   border: 1px solid var(--blue-bd);   color: var(--blue); }
+  .note-warn { background: var(--amber-bg);  border: 1px solid var(--amber-bd);  color: var(--amber); }
+  .note-data { background: var(--teal-bg);   border: 1px solid var(--teal-bd);   color: var(--teal); }
+
+  /* ── WIDE CARD ── */
+  .wide-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px; overflow: hidden;
+    margin-bottom: 12px;
+  }
+  .wide-card-head {
+    padding: 10px 14px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 10px;
+    background: var(--surface2);
+  }
+  .wide-card-title { font-size: 13px; font-weight: 500; }
+  .wide-card-sub { font-size: 11.5px; color: var(--muted); margin-left: auto; }
+  .wide-card-body { padding: 12px 14px; }
+
+  /* ── COMPARISON TABLE ── */
+  .comparison-wrap { overflow-x: auto; }
+  table.cmp {
+    width: 100%; border-collapse: collapse; font-size: 12px;
+  }
+  table.cmp th {
+    font-family: var(--mono); font-size: 10px; font-weight: 600;
+    letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--faint); padding: 6px 10px; text-align: left;
+    border-bottom: 1px solid var(--border);
+  }
+  table.cmp td {
+    padding: 7px 10px; border-bottom: 1px solid var(--border);
+    font-family: var(--mono); font-size: 11.5px; vertical-align: top;
+    line-height: 1.5;
+  }
+  table.cmp tr:last-child td { border-bottom: none; }
+  table.cmp tr:hover td { background: var(--surface2); }
+  table.cmp td.label { color: var(--muted); font-family: var(--sans); font-size: 12px; }
+  table.cmp td.fn-col { color: var(--blue); }
+  table.cmp td.input-col { color: var(--coral); }
+  table.cmp td.output-col { color: var(--teal); font-weight: 500; }
+
+  /* ── REGEX PLAYGROUND ── */
+  .regex-playground {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px; padding: 16px;
+    margin-bottom: 12px;
+  }
+  .playground-title {
+    font-size: 13px; font-weight: 500; margin-bottom: 12px;
+    color: var(--text);
+  }
+  .pg-row { display: flex; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
+  .pg-input {
+    flex: 1; min-width: 160px;
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 5px; padding: 7px 10px;
+    font-family: var(--mono); font-size: 12px; color: var(--text);
+    transition: border-color 0.12s;
+  }
+  .pg-input:focus { outline: none; border-color: #3B82F6; box-shadow: 0 0 0 2px #DBEAFE; }
+  .pg-label { font-size: 11px; color: var(--muted); margin-bottom: 3px; font-weight: 500; }
+  .pg-result {
+    background: var(--code-bg);
+    color: var(--code-fg);
+    border: 1px solid #313244;
+    border-radius: 6px; padding: 10px 13px;
+    font-family: var(--mono); font-size: 12px; line-height: 1.8;
+    min-height: 54px;
+    font-variant-ligatures: none;
+    font-feature-settings: "liga" 0, "calt" 0;
+  }
+
+  /* ── MIGRATION SECTION ── */
+  .migration-step {
+    display: flex; gap: 14px; align-items: flex-start;
+    margin-bottom: 16px;
+  }
+  .step-num {
+    width: 24px; height: 24px; border-radius: 50%; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--mono); font-size: 11px; font-weight: 600;
+    background: #3B82F6; color: #fff; margin-top: 2px;
+  }
+  .step-body { flex: 1; }
+  .step-title { font-size: 13px; font-weight: 600; margin-bottom: 4px; letter-spacing: -0.01em; }
+  .step-desc { font-size: 12px; color: var(--muted); margin-bottom: 8px; line-height: 1.55; }
+
+  /* ── QUICK REF GRID ── */
+  .qr-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 8px; margin-top: 8px;
+  }
+  .qr-cell {
+    background: var(--surface2); border-radius: 6px;
+    padding: 9px 12px; border: 1px solid var(--border);
+  }
+  .qr-fn { font-family: var(--mono); font-size: 11px; font-weight: 500; color: var(--blue); margin-bottom: 3px; }
+  .qr-what { font-size: 11px; color: var(--muted); }
+
+  /* ── FOOTER ── */
+  .page-footer {
+    text-align: center; padding: 2rem;
+    font-family: var(--mono); font-size: 10px; color: var(--faint);
+    letter-spacing: 0.1em; text-transform: uppercase;
+    border-top: 1px solid var(--border);
+  }
+
+  /* hide panels */
+  .panel { display: none; }
+  .panel.active { display: block; }
+</style>
+</head>
+<body>
+
+<!-- ══ HEADER ══ -->
+<div class="page-header">
+  <div class="header-eyebrow">Week 2 · Pre-class reading</div>
+  <h1 class="header-title">PostgreSQL <em>String Functions</em></h1>
+  <p class="header-sub">
+    Everything you need to clean messy text data before migrating rides.csv into the normalized schema.
+    Read this before class — you'll use every one of these.
+  </p>
+  <div class="header-tags">
+    <span class="header-tag">LOWER / UPPER</span>
+    <span class="header-tag">TRIM</span>
+    <span class="header-tag">REPLACE</span>
+    <span class="header-tag">SUBSTRING</span>
+    <span class="header-tag">SPLIT_PART</span>
+    <span class="header-tag">CONCAT</span>
+    <span class="header-tag">LENGTH / CHAR_LENGTH</span>
+    <span class="header-tag">LIKE / ILIKE</span>
+    <span class="header-tag">REGEXP_REPLACE</span>
+    <span class="header-tag">COALESCE</span>
+  </div>
+</div>
+
+<!-- ══ NAV ══ -->
+<nav class="sticky-nav" role="navigation" aria-label="Sections">
+  <button class="nav-tab active" onclick="show('basics')">01 · Basics</button>
+  <button class="nav-tab" onclick="show('search')">02 · Search &amp; Match</button>
+  <button class="nav-tab" onclick="show('extract')">03 · Extract &amp; Split</button>
+  <button class="nav-tab" onclick="show('regex')">04 · regexp_replace</button>
+  <button class="nav-tab" onclick="show('migration')">05 · Migration patterns</button>
+  <button class="nav-tab" onclick="show('quickref')">Quick ref</button>
+</nav>
+
+<div class="main">
+
+<!-- ══════════════════════════════════════════════
+  PANEL 1 — BASICS
+══════════════════════════════════════════════ -->
+<div class="panel active" id="basics">
+
+  <!-- CASE -->
+  <div class="section">
+    <div class="section-head">
+      <div class="section-icon" style="background:#EAF2FB; color:#1A4F8A; font-size:13px; font-weight:600;">Aa</div>
+      <span class="section-title">Case conversion</span>
+      <span class="section-count">2 functions</span>
+    </div>
+    <div class="fn-grid">
+
+      <div class="fn-card">
+        <div class="fn-header">
+          <span class="fn-badge" style="background:#EAF2FB;color:#1A4F8A;border:1px solid #A8C8EE">case</span>
+          <span class="fn-name">LOWER( string )</span>
+        </div>
+        <div class="fn-body">
+          <p class="fn-desc">Converts every character to lowercase. Most important function in data cleaning — fixes casing mismatches that cause GROUP BY to split one person into two rows.</p>
+          <div class="code-block"><span class="kw">SELECT</span> <span class="fn">LOWER</span>(<span class="st">'Ramesh Shrestha'</span>);
+<span class="cm">-- Result:</span>
+<span class="out">ramesh shrestha</span>
+
+<span class="cm">-- Real use: normalise before matching</span>
+<span class="kw">WHERE</span> <span class="fn">LOWER</span>(driver_name) = <span class="fn">LOWER</span>(<span class="st">'ramesh shrestha'</span>)</div>
+          <div class="result-row">
+            <span class="result-label">input</span><span class="result-val amber">'Ramesh Shrestha'</span>
+            <span class="result-label">→</span><span class="result-val">'ramesh shrestha'</span>
+          </div>
+          <div class="note-box note-warn">
+            <span class="note-icon">⚠</span>
+            <span>Our rides table has both <code>'ramesh shrestha'</code> and <code>'Ramesh Shrestha'</code>. Without LOWER, a GROUP BY treats them as two different drivers.</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="fn-card">
+        <div class="fn-header">
+          <span class="fn-badge" style="background:#EAF2FB;color:#1A4F8A;border:1px solid #A8C8EE">case</span>
+          <span class="fn-name">UPPER( string )</span>
+        </div>
+        <div class="fn-body">
+          <p class="fn-desc">Converts every character to uppercase. Less common in data cleaning but useful for status codes, codes, and labels where you want a canonical uppercase form.</p>
+          <div class="code-block"><span class="kw">SELECT</span> <span class="fn">UPPER</span>(<span class="st">'completed'</span>);
+<span class="out">COMPLETED</span>
+
+<span class="cm">-- Normalise status codes</span>
+<span class="kw">SELECT</span> <span class="fn">UPPER</span>(status) <span class="kw">FROM</span> rides;</div>
+          <div class="result-row">
+            <span class="result-label">input</span><span class="result-val amber">'completed'</span>
+            <span class="result-label">→</span><span class="result-val">'COMPLETED'</span>
+          </div>
+          <div class="note-box note-tip">
+            <span class="note-icon">💡</span>
+            <span>INITCAP('ramesh shrestha') → 'Ramesh Shrestha'. Capitalises first letter of every word — useful for display names after cleaning.</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- TRIM -->
+  <div class="section">
+    <div class="section-head">
+      <div class="section-icon" style="background:#E4F4F0; color:#0D6B5E; font-size:11px; font-weight:700;">···</div>
+      <span class="section-title">Whitespace removal</span>
+      <span class="section-count">3 functions</span>
+    </div>
+    <div class="fn-grid">
+
+      <div class="fn-card">
+        <div class="fn-header">
+          <span class="fn-badge" style="background:#E4F4F0;color:#0D6B5E;border:1px solid #A8D9CF">trim</span>
+          <span class="fn-name">TRIM( string )</span>
+        </div>
+        <div class="fn-body">
+          <p class="fn-desc">Removes leading and trailing spaces (both sides). The default behaviour — what you want 95% of the time for CSV data where fields often carry padding.</p>
+          <div class="code-block"><span class="kw">SELECT</span> <span class="fn">TRIM</span>(<span class="st">'  Kathmandu  '</span>);
+<span class="out">Kathmandu</span>
+
+<span class="cm">-- Combined with LOWER — the standard cleaning pair</span>
+<span class="fn">LOWER</span>(<span class="fn">TRIM</span>(city_name))</div>
+          <div class="result-row">
+            <span class="result-label">input</span><span class="result-val amber">'  Kathmandu  '</span>
+            <span class="result-label">→</span><span class="result-val">'Kathmandu'</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="fn-card">
+        <div class="fn-header">
+          <span class="fn-badge" style="background:#E4F4F0;color:#0D6B5E;border:1px solid #A8D9CF">trim</span>
+          <span class="fn-name">LTRIM / RTRIM</span>
+        </div>
+        <div class="fn-body">
+          <p class="fn-desc">LTRIM removes spaces from the left side only. RTRIM removes from the right only. Rarely needed vs TRIM but useful when only one side has the problem.</p>
+          <div class="code-block"><span class="kw">SELECT</span> <span class="fn">LTRIM</span>(<span class="st">'   hello'</span>);
+<span class="out">hello</span>
+
+<span class="kw">SELECT</span> <span class="fn">RTRIM</span>(<span class="st">'hello   '</span>);
+<span class="out">hello</span></div>
+          <div class="result-row">
+            <span class="result-label">LTRIM</span><span class="result-val amber">'   hello'</span>
+            <span class="result-label">→</span><span class="result-val">'hello'</span>
+          </div>
+          <div class="note-box note-tip">
+            <span class="note-icon">💡</span>
+            <span>TRIM can also strip specific characters: TRIM(BOTH ',' FROM ',hello,') → 'hello'</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- REPLACE / CONCAT / LENGTH -->
+  <div class="section">
+    <div class="section-head">
+      <div class="section-icon" style="background:#FDF3E0; color:#7A4A08; font-size:13px;">→</div>
+      <span class="section-title">Replace, combine & measure</span>
+      <span class="section-count">4 functions</span>
+    </div>
+    <div class="fn-grid">
+
+      <div class="fn-card">
+        <div class="fn-header">
+          <span class="fn-badge" style="background:#FDF3E0;color:#7A4A08;border:1px solid #F0C97A">replace</span>
+          <span class="fn-name">REPLACE( string, from, to )</span>
+        </div>
+        <div class="fn-body">
+          <p class="fn-desc">Replaces every occurrence of a substring with another. Case-sensitive. Great for fixing known typos, removing characters, or swapping separators.</p>
+          <div class="code-block"><span class="cm">-- Fix a known typo in city names</span>
+<span class="fn">REPLACE</span>(city_name, <span class="st">'Kathamndu'</span>, <span class="st">'Kathmandu'</span>)
+
+<span class="cm">-- Remove dashes from phone numbers</span>
+<span class="fn">REPLACE</span>(phone, <span class="st">'-'</span>, <span class="st">''</span>)
+<span class="cm">-- '98-4100-1234'  →  '9841001234'</span>
+
+<span class="cm">-- Replace spaces with underscores</span>
+<span class="fn">REPLACE</span>(<span class="st">'New Road'</span>, <span class="st">' '</span>, <span class="st">'_'</span>)
+<span class="out">New_Road</span></div>
+          <div class="result-row">
+            <span class="result-label">input</span><span class="result-val amber">'98-4100-1234'</span>
+            <span class="result-label">→</span><span class="result-val">'9841001234'</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="fn-card">
+        <div class="fn-header">
+          <span class="fn-badge" style="background:#FDF3E0;color:#7A4A08;border:1px solid #F0C97A">combine</span>
+          <span class="fn-name">CONCAT( val1, val2, … )</span>
+        </div>
+        <div class="fn-body">
+          <p class="fn-desc">Joins multiple strings into one. Also written with the <code>||</code> operator. CONCAT ignores NULLs; <code>||</code> returns NULL if any part is NULL.</p>
+          <div class="code-block"><span class="cm">-- Build a full name from parts</span>
+<span class="fn">CONCAT</span>(first_name, <span class="st">' '</span>, last_name)
+
+<span class="cm">-- With the || operator</span>
+first_name <span class="op">||</span> <span class="st">' '</span> <span class="op">||</span> last_name
+
+<span class="cm">-- Build a readable label</span>
+<span class="fn">CONCAT</span>(city_name, <span class="st">' ('</span>, country, <span class="st">')'</span>)
+<span class="out">Kathmandu (NP)</span></div>
+          <div class="result-row">
+            <span class="result-label">CONCAT</span><span class="result-val amber">'Ramesh' + ' ' + 'Shrestha'</span>
+            <span class="result-label">→</span><span class="result-val">'Ramesh Shrestha'</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="fn-card">
+        <div class="fn-header">
+          <span class="fn-badge" style="background:#FDF3E0;color:#7A4A08;border:1px solid #F0C97A">measure</span>
+          <span class="fn-name">LENGTH( string )</span>
+        </div>
+        <div class="fn-body">
+          <p class="fn-desc">Returns the number of characters in a string. Useful for validation — detect values that are suspiciously short/long before inserting them.</p>
+          <div class="code-block"><span class="kw">SELECT</span> <span class="fn">LENGTH</span>(<span class="st">'Kathmandu'</span>);
+<span class="out">9</span>
+
+<span class="cm">-- Find suspiciously short names (data issue)</span>
+<span class="kw">SELECT</span> driver_name <span class="kw">FROM</span> rides_staging
+<span class="kw">WHERE</span> <span class="fn">LENGTH</span>(<span class="fn">TRIM</span>(driver_name)) < <span class="nm">3</span>;</div>
+          <div class="result-row">
+            <span class="result-label">input</span><span class="result-val amber">'Kathmandu'</span>
+            <span class="result-label">→</span><span class="result-val green">9</span>
+          </div>
+          <div class="note-box note-tip">
+            <span class="note-icon">💡</span>
+            <span>CHAR_LENGTH() is identical to LENGTH() for plain text. Use LENGTH() for simplicity.</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="fn-card">
+        <div class="fn-header">
+          <span class="fn-badge" style="background:#FDF3E0;color:#7A4A08;border:1px solid #F0C97A">nulls</span>
+          <span class="fn-name">COALESCE( val1, val2, … )</span>
+        </div>
+        <div class="fn-body">
+          <p class="fn-desc">Returns the first non-NULL value from its arguments. Absolutely essential in migration — fills in missing values rather than letting NULLs propagate.</p>
+          <div class="code-block"><span class="cm">-- Replace NULL payment_method with default</span>
+<span class="fn">COALESCE</span>(payment_method, <span class="st">'unknown'</span>)
+
+<span class="cm">-- Use first available name</span>
+<span class="fn">COALESCE</span>(preferred_name, full_name, <span class="st">'Unnamed'</span>)
+
+<span class="cm">-- Convert NULL to empty string safely</span>
+<span class="fn">COALESCE</span>(notes, <span class="st">''</span>)</div>
+          <div class="result-row">
+            <span class="result-label">NULL input</span><span class="result-val amber">NULL, 'unknown'</span>
+            <span class="result-label">→</span><span class="result-val">'unknown'</span>
+          </div>
+          <div class="note-box note-warn">
+            <span class="note-icon">⚠</span>
+            <span>If any column in your migration SELECT could be NULL, wrap it with COALESCE before inserting. NULLs in FK columns will fail the constraint.</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+</div><!-- /basics -->
+
+
+<!-- ══════════════════════════════════════════════
+  PANEL 2 — SEARCH & MATCH
+══════════════════════════════════════════════ -->
+<div class="panel" id="search">
+
+  <div class="section">
+    <div class="section-head">
+      <div class="section-icon" style="background:#EEEbFD; color:#4A2D9C; font-size:14px;">🔍</div>
+      <span class="section-title">Pattern matching</span>
+      <span class="section-count">LIKE · ILIKE · POSITION · STRPOS</span>
+    </div>
+    <div class="fn-grid">
+
+      <div class="fn-card">
+        <div class="fn-header">
+          <span class="fn-badge" style="background:#EEEbFD;color:#4A2D9C;border:1px solid #BFB4F0">match</span>
+          <span class="fn-name">LIKE &amp; ILIKE</span>
+        </div>
+        <div class="fn-body">
+          <p class="fn-desc">LIKE matches a pattern — <code>%</code> means any characters, <code>_</code> means exactly one character. ILIKE is the same but case-insensitive. Use ILIKE for user-facing searches.</p>
+          <div class="code-block"><span class="cm">-- LIKE: case-sensitive</span>
+<span class="kw">SELECT</span> * <span class="kw">FROM</span> rides <span class="kw">WHERE</span> driver_name <span class="kw">LIKE</span> <span class="st">'Ramesh%'</span>;
+<span class="cm">-- Matches: 'Ramesh Shrestha', 'Ramesh K.' etc.</span>
+<span class="cm">-- Does NOT match: 'ramesh shrestha'</span>
+
+<span class="cm">-- ILIKE: case-insensitive (PostgreSQL only)</span>
+<span class="kw">SELECT</span> * <span class="kw">FROM</span> rides <span class="kw">WHERE</span> driver_name <span class="kw">ILIKE</span> <span class="st">'ramesh%'</span>;
+<span class="cm">-- Matches: 'Ramesh', 'RAMESH', 'ramesh' all match</span>
+
+<span class="cm">-- Wildcard on both sides = contains</span>
+<span class="kw">WHERE</span> city_name <span class="kw">ILIKE</span> <span class="st">'%mandu%'</span></div>
+          <div class="result-row">
+            <span class="result-label">LIKE 'R%'</span>
+            <span class="result-val amber">'Ramesh'</span>
+            <span class="result-label">match</span>
+            <span class="result-val green">TRUE</span>
+          </div>
+          <div class="result-row" style="margin-top:4px">
+            <span class="result-label">LIKE 'R%'</span>
+            <span class="result-val amber">'ramesh'</span>
+            <span class="result-label">match</span>
+            <span class="result-val red">FALSE</span>
+          </div>
+          <div class="note-box note-tip">
+            <span class="note-icon">💡</span>
+            <span>Wildcards: <code>%</code> = zero or more any characters. <code>_</code> = exactly one any character. Example: <code>LIKE 'R_mesh'</code> matches 'Ramesh' but not 'Raamesh'.</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="fn-card">
+        <div class="fn-header">
+          <span class="fn-badge" style="background:#EEEbFD;color:#4A2D9C;border:1px solid #BFB4F0">position</span>
+          <span class="fn-name">POSITION / STRPOS</span>
+        </div>
+        <div class="fn-body">
+          <p class="fn-desc">Returns the position (index) of a substring inside a string. Returns 0 if not found. Strings in PostgreSQL are 1-indexed. Both functions do the same thing, different syntax.</p>
+          <div class="code-block"><span class="cm">-- POSITION syntax</span>
+<span class="fn">POSITION</span>(<span class="st">'@'</span> <span class="kw">IN</span> <span class="st">'user@example.com'</span>)
+<span class="out">5</span>
+
+<span class="cm">-- STRPOS syntax (same result)</span>
+<span class="fn">STRPOS</span>(<span class="st">'user@example.com'</span>, <span class="st">'@'</span>)
+<span class="out">5</span>
+
+<span class="cm">-- Find rows where city has a space (compound names)</span>
+<span class="kw">WHERE</span> <span class="fn">STRPOS</span>(city_name, <span class="st">' '</span>) > <span class="nm">0</span></div>
+          <div class="result-row">
+            <span class="result-label">POSITION('@' IN 'user@example.com')</span>
+            <span class="result-val green">5</span>
+          </div>
+          <div class="result-row" style="margin-top:4px">
+            <span class="result-label">not found</span>
+            <span class="result-val red">0</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="fn-card">
+        <div class="fn-header">
+          <span class="fn-badge" style="background:#EEEbFD;color:#4A2D9C;border:1px solid #BFB4F0">check</span>
+          <span class="fn-name">STARTS_WITH / ENDS_WITH</span>
+        </div>
+        <div class="fn-body">
+          <p class="fn-desc">Returns TRUE or FALSE. Cleaner than LIKE for simple prefix/suffix checks. STARTS_WITH is case-sensitive. For case-insensitive prefix check, use ILIKE 'prefix%' instead.</p>
+          <div class="code-block"><span class="fn">STARTS_WITH</span>(<span class="st">'Kathmandu'</span>, <span class="st">'Kath'</span>)
+<span class="out">true</span>
+
+<span class="fn">ENDS_WITH</span>(<span class="st">'completed'</span>, <span class="st">'ed'</span>)
+<span class="out">true</span>
+
+<span class="cm">-- Filter: only rows where status starts with 'comp'</span>
+<span class="kw">WHERE</span> <span class="fn">STARTS_WITH</span>(status, <span class="st">'comp'</span>)</div>
+          <div class="result-row">
+            <span class="result-label">STARTS_WITH('Kath…', 'Kath')</span>
+            <span class="result-val green">true</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+</div><!-- /search -->
+
+
+<!-- ══════════════════════════════════════════════
+  PANEL 3 — EXTRACT & SPLIT
+══════════════════════════════════════════════ -->
+<div class="panel" id="extract">
+
+  <div class="section">
+    <div class="section-head">
+      <div class="section-icon" style="background:#EAF5EA; color:#1E5C1E; font-size:13px;">✂</div>
+      <span class="section-title">Extracting parts of strings</span>
+      <span class="section-count">SUBSTRING · LEFT · RIGHT · SPLIT_PART</span>
+    </div>
+    <div class="fn-grid">
+
+      <div class="fn-card">
+        <div class="fn-header">
+          <span class="fn-badge" style="background:#EAF5EA;color:#1E5C1E;border:1px solid #9FD59F">extract</span>
+          <span class="fn-name">SUBSTRING( str FROM pos FOR len )</span>
+        </div>
+        <div class="fn-body">
+          <p class="fn-desc">Extracts a portion of a string starting at position <code>pos</code> for <code>len</code> characters. Positions are 1-indexed. Can also accept a regex pattern (see Panel 4).</p>
+          <div class="code-block"><span class="cm">-- From position 1, take 4 characters</span>
+<span class="fn">SUBSTRING</span>(<span class="st">'Kathmandu'</span> <span class="kw">FROM</span> <span class="nm">1</span> <span class="kw">FOR</span> <span class="nm">4</span>)
+<span class="out">Kath</span>
+
+<span class="cm">-- Extract year from a date string</span>
+<span class="fn">SUBSTRING</span>(<span class="st">'2024-03-15'</span> <span class="kw">FROM</span> <span class="nm">1</span> <span class="kw">FOR</span> <span class="nm">4</span>)
+<span class="out">2024</span>
+
+<span class="cm">-- Also written as SUBSTR(string, start, length)</span>
+<span class="fn">SUBSTR</span>(<span class="st">'Kathmandu'</span>, <span class="nm">5</span>, <span class="nm">5</span>)
+<span class="out">mandu</span></div>
+          <div class="result-row">
+            <span class="result-label">FROM 1 FOR 4</span><span class="result-val amber">'Kathmandu'</span>
+            <span class="result-label">→</span><span class="result-val">'Kath'</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="fn-card">
+        <div class="fn-header">
+          <span class="fn-badge" style="background:#EAF5EA;color:#1E5C1E;border:1px solid #9FD59F">extract</span>
+          <span class="fn-name">LEFT( string, n ) &amp; RIGHT( string, n )</span>
+        </div>
+        <div class="fn-body">
+          <p class="fn-desc">LEFT returns the first <code>n</code> characters. RIGHT returns the last <code>n</code> characters. Simpler than SUBSTRING when you just need the beginning or end.</p>
+          <div class="code-block"><span class="fn">LEFT</span>(<span class="st">'Kathmandu'</span>, <span class="nm">4</span>)
+<span class="out">Kath</span>
+
+<span class="fn">RIGHT</span>(<span class="st">'Kathmandu'</span>, <span class="nm">4</span>)
+<span class="out">andu</span>
+
+<span class="cm">-- Get two-letter country code from end</span>
+<span class="fn">RIGHT</span>(<span class="st">'Kathmandu NP'</span>, <span class="nm">2</span>)
+<span class="out">NP</span></div>
+          <div class="result-row">
+            <span class="result-label">LEFT 4</span><span class="result-val amber">'Kathmandu'</span>
+            <span class="result-label">→</span><span class="result-val">'Kath'</span>
+          </div>
+          <div class="result-row" style="margin-top:4px">
+            <span class="result-label">RIGHT 4</span><span class="result-val amber">'Kathmandu'</span>
+            <span class="result-label">→</span><span class="result-val">'andu'</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="fn-card">
+        <div class="fn-header">
+          <span class="fn-badge" style="background:#EAF5EA;color:#1E5C1E;border:1px solid #9FD59F">split</span>
+          <span class="fn-name">SPLIT_PART( string, delimiter, n )</span>
+        </div>
+        <div class="fn-body">
+          <p class="fn-desc">Splits a string on a delimiter and returns the nth part (1-indexed). Extremely useful for CSV-style columns, email addresses, or any delimited data stored as text.</p>
+          <div class="code-block"><span class="cm">-- Split email into username and domain</span>
+<span class="fn">SPLIT_PART</span>(<span class="st">'ramesh@example.com'</span>, <span class="st">'@'</span>, <span class="nm">1</span>)
+<span class="out">ramesh</span>
+
+<span class="fn">SPLIT_PART</span>(<span class="st">'ramesh@example.com'</span>, <span class="st">'@'</span>, <span class="nm">2</span>)
+<span class="out">example.com</span>
+
+<span class="cm">-- Extract city from "City, Province" format</span>
+<span class="fn">SPLIT_PART</span>(<span class="st">'Kathmandu, Bagmati'</span>, <span class="st">','</span>, <span class="nm">1</span>)
+<span class="out">Kathmandu</span>
+
+<span class="cm">-- Get last segment of a path</span>
+<span class="fn">SPLIT_PART</span>(<span class="st">'/data/2024/rides.csv'</span>, <span class="st">'/'</span>, <span class="nm">4</span>)
+<span class="out">rides.csv</span></div>
+          <div class="result-row">
+            <span class="result-label">part 1 of '@'</span><span class="result-val amber">'ramesh@example.com'</span>
+            <span class="result-label">→</span><span class="result-val">'ramesh'</span>
+          </div>
+          <div class="note-box note-data">
+            <span class="note-icon">📌</span>
+            <span>Returns an empty string (not NULL) if the requested part doesn't exist. Part numbers start at 1, not 0.</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="fn-card">
+        <div class="fn-header">
+          <span class="fn-badge" style="background:#EAF5EA;color:#1E5C1E;border:1px solid #9FD59F">pad</span>
+          <span class="fn-name">LPAD / RPAD</span>
+        </div>
+        <div class="fn-body">
+          <p class="fn-desc">Pads a string to a target length by adding characters on the left or right. Useful for formatting IDs, codes, and fixed-width output columns.</p>
+          <div class="code-block"><span class="cm">-- Zero-pad a numeric ID to 6 digits</span>
+<span class="fn">LPAD</span>(<span class="fn">CAST</span>(driver_id <span class="kw">AS TEXT</span>), <span class="nm">6</span>, <span class="st">'0'</span>)
+<span class="cm">-- 42  →  '000042'</span>
+
+<span class="cm">-- Right-pad to align column output</span>
+<span class="fn">RPAD</span>(city_name, <span class="nm">15</span>, <span class="st">' '</span>)
+<span class="cm">-- 'Dharan         '</span></div>
+          <div class="result-row">
+            <span class="result-label">LPAD(42, 6, '0')</span>
+            <span class="result-label">→</span><span class="result-val">'000042'</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Comparison table -->
+  <div class="wide-card">
+    <div class="wide-card-head">
+      <span class="wide-card-title">Extraction functions side by side</span>
+      <span class="wide-card-sub">same input: 'Ramesh Shrestha'</span>
+    </div>
+    <div class="wide-card-body">
+      <div class="comparison-wrap">
+        <table class="cmp">
+          <thead><tr><th>function</th><th>call</th><th>result</th></tr></thead>
+          <tbody>
+            <tr><td class="label">LEFT</td><td class="fn-col">LEFT('Ramesh Shrestha', 6)</td><td class="output-col">'Ramesh'</td></tr>
+            <tr><td class="label">RIGHT</td><td class="fn-col">RIGHT('Ramesh Shrestha', 8)</td><td class="output-col">'Shrestha'</td></tr>
+            <tr><td class="label">SUBSTRING</td><td class="fn-col">SUBSTRING('Ramesh Shrestha' FROM 8 FOR 8)</td><td class="output-col">'Shrestha'</td></tr>
+            <tr><td class="label">SPLIT_PART</td><td class="fn-col">SPLIT_PART('Ramesh Shrestha', ' ', 1)</td><td class="output-col">'Ramesh'</td></tr>
+            <tr><td class="label">SPLIT_PART</td><td class="fn-col">SPLIT_PART('Ramesh Shrestha', ' ', 2)</td><td class="output-col">'Shrestha'</td></tr>
+            <tr><td class="label">LENGTH</td><td class="fn-col">LENGTH('Ramesh Shrestha')</td><td class="output-col">15</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /extract -->
+
+
+<!-- ══════════════════════════════════════════════
+  PANEL 4 — REGEXP_REPLACE
+══════════════════════════════════════════════ -->
+<div class="panel" id="regex">
+
+  <div class="section">
+    <div class="section-head">
+      <div class="section-icon" style="background:#FDEAEA; color:#8A2020; font-size:12px; font-weight:600;">.*</div>
+      <span class="section-title">regexp_replace — pattern-based cleaning</span>
+    </div>
+
+    <!-- What is a regex -->
+    <div class="wide-card" style="margin-bottom:14px">
+      <div class="wide-card-head">
+        <span class="wide-card-title">What is a regular expression (regex)?</span>
+      </div>
+      <div class="wide-card-body">
+        <p style="font-size:12.5px; color:var(--muted); margin-bottom:10px; line-height:1.6;">
+          A regex is a pattern that describes a set of strings. Instead of writing <code>REPLACE('abc', 'a', '')</code> for one specific character, a regex lets you say <em>"remove any digit"</em> or <em>"remove all characters that aren't letters"</em> — applying to millions of different variations with one expression.
+        </p>
+        <div class="comparison-wrap">
+          <table class="cmp">
+            <thead><tr><th>pattern</th><th>what it matches</th><th>example match</th></tr></thead>
+            <tbody>
+              <tr><td class="fn-col">[0-9]</td><td class="label">any single digit</td><td class="output-col">'9' in 'NP9841'</td></tr>
+              <tr><td class="fn-col">[^0-9]</td><td class="label">any character that is NOT a digit</td><td class="output-col">'N', 'P' in 'NP9841'</td></tr>
+              <tr><td class="fn-col">[a-zA-Z]</td><td class="label">any letter</td><td class="output-col">'R' in 'Ramesh'</td></tr>
+              <tr><td class="fn-col">\s</td><td class="label">any whitespace (space, tab, newline)</td><td class="output-col">the space in 'New Road'</td></tr>
+              <tr><td class="fn-col">\s+</td><td class="label">one or more whitespace characters</td><td class="output-col">'   ' (multiple spaces)</td></tr>
+              <tr><td class="fn-col">[^a-zA-Z\s]</td><td class="label">anything not a letter or space</td><td class="output-col">digits, dashes, brackets</td></tr>
+              <tr><td class="fn-col">^</td><td class="label">start of string</td><td class="output-col">anchors the pattern to the beginning</td></tr>
+              <tr><td class="fn-col">$</td><td class="label">end of string</td><td class="output-col">anchors the pattern to the end</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Syntax card -->
+    <div class="fn-card" style="margin-bottom:12px">
+      <div class="fn-header">
+        <span class="fn-badge" style="background:#FDEAEA;color:#8A2020;border:1px solid #F0AAAA">regex</span>
+        <span class="fn-name">REGEXP_REPLACE( string, pattern, replacement, flags )</span>
+      </div>
+      <div class="fn-body">
+        <p class="fn-desc">Replaces parts of a string that match a regex pattern. The <code>flags</code> argument is optional: <code>'g'</code> replaces all matches (not just the first), <code>'i'</code> makes it case-insensitive.</p>
+        <div class="code-block"><span class="cm">-- Syntax</span>
+<span class="fn">REGEXP_REPLACE</span>(string, pattern, replacement [, flags])
+
+<span class="cm">-- Remove ALL digits from a string  (flag 'g' = replace all)</span>
+<span class="fn">REGEXP_REPLACE</span>(<span class="st">'Ramesh123'</span>, <span class="st">'[0-9]'</span>, <span class="st">''</span>, <span class="st">'g'</span>)
+<span class="out">Ramesh</span>
+
+<span class="cm">-- Remove ALL non-digit characters  (keep only numbers)</span>
+<span class="fn">REGEXP_REPLACE</span>(<span class="st">'98-4100 1234'</span>, <span class="st">'[^0-9]'</span>, <span class="st">''</span>, <span class="st">'g'</span>)
+<span class="out">9841001234</span>
+
+<span class="cm">-- Collapse multiple spaces into one</span>
+<span class="fn">REGEXP_REPLACE</span>(<span class="st">'New   Road'</span>, <span class="st">'\s+'</span>, <span class="st">' '</span>, <span class="st">'g'</span>)
+<span class="out">New Road</span>
+
+<span class="cm">-- Remove all special characters, keep letters + spaces</span>
+<span class="fn">REGEXP_REPLACE</span>(city_name, <span class="st">'[^a-zA-Z\s]'</span>, <span class="st">''</span>, <span class="st">'g'</span>)
+
+<span class="cm">-- Case-insensitive flag 'i': remove 'np' or 'NP'</span>
+<span class="fn">REGEXP_REPLACE</span>(<span class="st">'Kathmandu NP'</span>, <span class="st">'np$'</span>, <span class="st">''</span>, <span class="st">'gi'</span>)
+<span class="out">Kathmandu </span></div>
+      </div>
+    </div>
+
+    <!-- Interactive playground -->
+    <div class="regex-playground">
+      <div class="playground-title">
+        <span style="font-size:13px; font-weight:500;">Try it — REGEXP_REPLACE playground</span>
+      </div>
+      <div class="pg-row">
+        <div style="flex:2; min-width:160px">
+          <div class="pg-label">Input string</div>
+          <input class="pg-input" id="pg-input" value="  Ramesh123 Shrestha!!  " oninput="runPlayground()">
+        </div>
+        <div style="flex:2; min-width:160px">
+          <div class="pg-label">Pattern (regex)</div>
+          <input class="pg-input" id="pg-pattern" value="[^a-zA-Z\s]" oninput="runPlayground()">
+        </div>
+        <div style="flex:1; min-width:100px">
+          <div class="pg-label">Replacement</div>
+          <input class="pg-input" id="pg-replace" value="" oninput="runPlayground()">
+        </div>
+        <div style="flex:1; min-width:80px">
+          <div class="pg-label">Flags (g / i / gi)</div>
+          <input class="pg-input" id="pg-flags" value="g" oninput="runPlayground()">
+        </div>
+      </div>
+      <div class="pg-label" style="margin-bottom:4px">Result</div>
+      <div class="pg-result" id="pg-result"></div>
+
+      <!-- Preset buttons -->
+      <div style="display:flex; flex-wrap:wrap; gap:6px; margin-top:10px">
+        <button onclick="setPreset('[0-9]','','g')" style="font-family:var(--mono);font-size:10px;padding:4px 10px;border:1px solid var(--border);border-radius:4px;background:var(--surface2);color:var(--muted);cursor:pointer">remove digits</button>
+        <button onclick="setPreset('[^0-9]','','g')" style="font-family:var(--mono);font-size:10px;padding:4px 10px;border:1px solid var(--border);border-radius:4px;background:var(--surface2);color:var(--muted);cursor:pointer">keep only digits</button>
+        <button onclick="setPreset('\\s+',' ','g')" style="font-family:var(--mono);font-size:10px;padding:4px 10px;border:1px solid var(--border);border-radius:4px;background:var(--surface2);color:var(--muted);cursor:pointer">collapse spaces</button>
+        <button onclick="setPreset('[^a-zA-Z\\s]','','g')" style="font-family:var(--mono);font-size:10px;padding:4px 10px;border:1px solid var(--border);border-radius:4px;background:var(--surface2);color:var(--muted);cursor:pointer">letters only</button>
+        <button onclick="setPreset('[^0-9]','','g'); document.getElementById('pg-input').value='98-4100 1234'; runPlayground()" style="font-family:var(--mono);font-size:10px;padding:4px 10px;border:1px solid var(--border);border-radius:4px;background:var(--surface2);color:var(--muted);cursor:pointer">clean phone</button>
+      </div>
+    </div>
+
+    <!-- REPLACE vs REGEXP_REPLACE -->
+    <div class="wide-card">
+      <div class="wide-card-head">
+        <span class="wide-card-title">REPLACE vs REGEXP_REPLACE — when to use which</span>
+      </div>
+      <div class="wide-card-body">
+        <div class="comparison-wrap">
+          <table class="cmp">
+            <thead><tr><th></th><th>REPLACE</th><th>REGEXP_REPLACE</th></tr></thead>
+            <tbody>
+              <tr><td class="label">Use when</td><td>You know the exact string to find</td><td>You need to match a pattern or character class</td></tr>
+              <tr><td class="label">Example need</td><td>Fix one specific typo everywhere</td><td>Remove all digits, collapse spaces, strip symbols</td></tr>
+              <tr><td class="label">Case sensitive</td><td>Always yes</td><td>Yes by default; add 'i' flag for insensitive</td></tr>
+              <tr><td class="label">Replace all</td><td>Always replaces all</td><td>Only all if you pass 'g' flag</td></tr>
+              <tr><td class="label">Example</td><td class="fn-col">REPLACE(phone,'-','')</td><td class="fn-col">REGEXP_REPLACE(phone,'[^0-9]','','g')</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+</div><!-- /regex -->
+
+
+<!-- ══════════════════════════════════════════════
+  PANEL 5 — MIGRATION PATTERNS
+══════════════════════════════════════════════ -->
+<div class="panel" id="migration">
+
+  <div class="section">
+    <div class="section-head">
+      <div class="section-icon" style="background:#FDF0EB; color:#8A3018; font-size:13px;">→</div>
+      <span class="section-title">Putting it all together — data migration cleaning patterns</span>
+    </div>
+
+    <p style="font-size:13px; color:var(--muted); margin-bottom:1.5rem; line-height:1.6;">
+      These are the actual patterns you'll write in the Week 2 migration script. Each one combines multiple string functions to solve a real problem in the rides.csv data.
+    </p>
+
+    <div class="migration-step">
+      <div class="step-num">1</div>
+      <div class="step-body">
+        <div class="step-title">Normalise driver and rider names before lookup</div>
+        <div class="step-desc">The flat table has casing inconsistencies. When inserting into the drivers lookup table and when searching by name, always apply LOWER + TRIM together.</div>
+        <div class="code-block"><span class="cm">-- Insert distinct driver names, cleaned</span>
+<span class="kw">INSERT INTO</span> drivers (name)
+<span class="kw">SELECT DISTINCT</span>
+    <span class="fn">INITCAP</span>(<span class="fn">LOWER</span>(<span class="fn">TRIM</span>(driver_name)))
+<span class="kw">FROM</span> rides_staging
+<span class="kw">WHERE</span> <span class="fn">TRIM</span>(driver_name) <span class="op">!=</span> <span class="st">''</span>
+  <span class="kw">AND</span> driver_name <span class="kw">IS NOT NULL</span>;
+
+<span class="cm">-- Later: match using the same normalisation</span>
+<span class="kw">SELECT</span> driver_id <span class="kw">FROM</span> drivers
+<span class="kw">WHERE</span> name = <span class="fn">INITCAP</span>(<span class="fn">LOWER</span>(<span class="fn">TRIM</span>(rs.driver_name)))</div>
+      </div>
+    </div>
+
+    <div class="migration-step">
+      <div class="step-num">2</div>
+      <div class="step-body">
+        <div class="step-title">Clean city names — strip symbols and collapse spaces</div>
+        <div class="step-desc">City data from CSVs often has extra punctuation, trailing commas, or double spaces. Chain TRIM + REGEXP_REPLACE to produce a canonical city name.</div>
+        <div class="code-block"><span class="cm">-- Remove anything that isn't a letter, digit, or space</span>
+<span class="cm">-- then collapse multiple spaces, then trim edges</span>
+<span class="fn">TRIM</span>(
+  <span class="fn">REGEXP_REPLACE</span>(
+    <span class="fn">REGEXP_REPLACE</span>(city_name, <span class="st">'[^a-zA-Z0-9\s]'</span>, <span class="st">''</span>, <span class="st">'g'</span>),
+    <span class="st">'\s+'</span>, <span class="st">' '</span>, <span class="st">'g'</span>
+  )
+)
+
+<span class="cm">-- Example transformations:</span>
+<span class="cm">-- '  Kath,mandu!!'  →  'Kathmandu'</span>
+<span class="cm">-- 'New  Road  '     →  'New Road'</span>
+<span class="cm">-- 'Dharan, '        →  'Dharan'</span></div>
+      </div>
+    </div>
+
+    <div class="migration-step">
+      <div class="step-num">3</div>
+      <div class="step-body">
+        <div class="step-title">Normalise status values</div>
+        <div class="step-desc">The status column may have 'Completed', 'COMPLETED', 'completed' all meaning the same thing. Standardise to lowercase before inserting.</div>
+        <div class="code-block"><span class="fn">LOWER</span>(<span class="fn">TRIM</span>(status)) <span class="kw">AS</span> status
+
+<span class="cm">-- Input variations → Output</span>
+<span class="cm">-- 'Completed '  →  'completed'</span>
+<span class="cm">-- 'CANCELLED'   →  'cancelled'</span>
+<span class="cm">-- ' pending'    →  'pending'</span>
+
+<span class="cm">-- Add a CHECK constraint so future data stays clean</span>
+status <span class="kw">TEXT CHECK</span>(status <span class="kw">IN</span> (<span class="st">'completed'</span>, <span class="st">'cancelled'</span>, <span class="st">'pending'</span>))</div>
+      </div>
+    </div>
+
+    <div class="migration-step">
+      <div class="step-num">4</div>
+      <div class="step-body">
+        <div class="step-title">Handle NULLs and empty strings safely</div>
+        <div class="step-desc">Empty strings (<code>''</code>) are not the same as NULL in PostgreSQL. Use NULLIF to convert empty strings to NULL, then COALESCE to provide a default.</div>
+        <div class="code-block"><span class="cm">-- Convert empty strings to NULL first</span>
+<span class="fn">NULLIF</span>(<span class="fn">TRIM</span>(payment_method), <span class="st">''</span>)
+<span class="cm">-- '   '  →  NULL  (instead of '   ')</span>
+
+<span class="cm">-- Then provide a default for NULLs</span>
+<span class="fn">COALESCE</span>(<span class="fn">NULLIF</span>(<span class="fn">TRIM</span>(payment_method), <span class="st">''</span>), <span class="st">'unknown'</span>)
+<span class="cm">-- ''     →  'unknown'</span>
+<span class="cm">-- NULL   →  'unknown'</span>
+<span class="cm">-- 'cash' →  'cash'</span></div>
+        <div class="note-box note-warn">
+          <span class="note-icon">⚠</span>
+          <span>TRIM('   ') returns '' (empty string), NOT NULL. Always follow TRIM with NULLIF if you want to treat blank-only values as missing data.</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="migration-step">
+      <div class="step-num">5</div>
+      <div class="step-body">
+        <div class="step-title">Full migration SELECT — all cleaning combined</div>
+        <div class="step-desc">This is what the INSERT INTO trips … SELECT will look like when you write it in class. Each column goes through the appropriate cleaning before being inserted.</div>
+        <div class="code-block"><span class="kw">INSERT INTO</span> trips
+    (driver_id, rider_id, pickup_location_id, dropoff_location_id,
+     fare_amount, distance_km, status, payment_method, rating)
+<span class="kw">SELECT</span>
+    <span class="cm">-- Resolve FK: look up driver_id using cleaned name</span>
+    (<span class="kw">SELECT</span> d.driver_id <span class="kw">FROM</span> drivers d
+     <span class="kw">WHERE</span>  d.name = <span class="fn">INITCAP</span>(<span class="fn">LOWER</span>(<span class="fn">TRIM</span>(rs.driver_name))))  <span class="kw">AS</span> driver_id,
+
+    (<span class="kw">SELECT</span> r.rider_id <span class="kw">FROM</span> riders r
+     <span class="kw">WHERE</span>  r.name = <span class="fn">INITCAP</span>(<span class="fn">LOWER</span>(<span class="fn">TRIM</span>(rs.rider_name))))   <span class="kw">AS</span> rider_id,
+
+    (<span class="kw">SELECT</span> l.location_id <span class="kw">FROM</span> locations l
+     <span class="kw">WHERE</span>  l.city_name = <span class="fn">TRIM</span>(rs.pickup_city))              <span class="kw">AS</span> pickup_location_id,
+
+    (<span class="kw">SELECT</span> l.location_id <span class="kw">FROM</span> locations l
+     <span class="kw">WHERE</span>  l.city_name = <span class="fn">TRIM</span>(rs.dropoff_city))             <span class="kw">AS</span> dropoff_location_id,
+
+    rs.fare_amount,
+    rs.distance_km,
+    <span class="fn">LOWER</span>(<span class="fn">TRIM</span>(rs.status))                                  <span class="kw">AS</span> status,
+    <span class="fn">COALESCE</span>(<span class="fn">NULLIF</span>(<span class="fn">TRIM</span>(rs.payment_method), <span class="st">''</span>), <span class="st">'unknown'</span>) <span class="kw">AS</span> payment_method,
+    rs.rating
+<span class="kw">FROM</span> rides_staging rs;</div>
+      </div>
+    </div>
+
+  </div>
+
+</div><!-- /migration -->
+
+
+<!-- ══════════════════════════════════════════════
+  PANEL 6 — QUICK REF
+══════════════════════════════════════════════ -->
+<div class="panel" id="quickref">
+
+  <div class="section">
+    <div class="section-head">
+      <div class="section-icon" style="background:#F1EFE8; color:#444; font-size:13px; font-weight:600;">≡</div>
+      <span class="section-title">All functions at a glance</span>
+    </div>
+
+    <div class="wide-card" style="margin-bottom:14px">
+      <div class="wide-card-head"><span class="wide-card-title">Case &amp; whitespace</span></div>
+      <div class="wide-card-body">
+        <div class="comparison-wrap">
+          <table class="cmp">
+            <thead><tr><th>function</th><th>what it does</th><th>migration use case</th></tr></thead>
+            <tbody>
+              <tr><td class="fn-col">LOWER(s)</td><td class="label">all lowercase</td><td>normalise names before lookup</td></tr>
+              <tr><td class="fn-col">UPPER(s)</td><td class="label">all uppercase</td><td>canonical status codes</td></tr>
+              <tr><td class="fn-col">INITCAP(s)</td><td class="label">Title Case every word</td><td>clean display name after LOWER</td></tr>
+              <tr><td class="fn-col">TRIM(s)</td><td class="label">remove leading + trailing spaces</td><td>every column before comparing or inserting</td></tr>
+              <tr><td class="fn-col">LTRIM(s)</td><td class="label">leading spaces only</td><td>rarely needed; use TRIM instead</td></tr>
+              <tr><td class="fn-col">RTRIM(s)</td><td class="label">trailing spaces only</td><td>rarely needed; use TRIM instead</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="wide-card" style="margin-bottom:14px">
+      <div class="wide-card-head"><span class="wide-card-title">Replace &amp; combine</span></div>
+      <div class="wide-card-body">
+        <div class="comparison-wrap">
+          <table class="cmp">
+            <thead><tr><th>function</th><th>what it does</th><th>migration use case</th></tr></thead>
+            <tbody>
+              <tr><td class="fn-col">REPLACE(s, from, to)</td><td class="label">swap exact substring</td><td>fix known typos in city names</td></tr>
+              <tr><td class="fn-col">REGEXP_REPLACE(s, pat, rep, 'g')</td><td class="label">pattern-based replace</td><td>remove symbols, collapse spaces, strip non-letters</td></tr>
+              <tr><td class="fn-col">CONCAT(a, b, …)</td><td class="label">join strings</td><td>build full names from first+last, add labels</td></tr>
+              <tr><td class="fn-col">a || b</td><td class="label">join strings (operator)</td><td>same as CONCAT; returns NULL if any part is NULL</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="wide-card" style="margin-bottom:14px">
+      <div class="wide-card-head"><span class="wide-card-title">Extract &amp; split</span></div>
+      <div class="wide-card-body">
+        <div class="comparison-wrap">
+          <table class="cmp">
+            <thead><tr><th>function</th><th>what it does</th><th>migration use case</th></tr></thead>
+            <tbody>
+              <tr><td class="fn-col">LENGTH(s)</td><td class="label">character count</td><td>validate minimum name length before insert</td></tr>
+              <tr><td class="fn-col">LEFT(s, n)</td><td class="label">first n chars</td><td>extract prefix codes, country codes</td></tr>
+              <tr><td class="fn-col">RIGHT(s, n)</td><td class="label">last n chars</td><td>extract suffix, two-letter codes</td></tr>
+              <tr><td class="fn-col">SUBSTRING(s FROM p FOR n)</td><td class="label">n chars starting at position p</td><td>extract year from date string</td></tr>
+              <tr><td class="fn-col">SPLIT_PART(s, delim, n)</td><td class="label">nth segment after splitting on delimiter</td><td>parse 'City, Province' into parts</td></tr>
+              <tr><td class="fn-col">POSITION(sub IN s)</td><td class="label">position of substring, 0 if not found</td><td>check if '@' present to validate emails</td></tr>
+              <tr><td class="fn-col">STRPOS(s, sub)</td><td class="label">same as POSITION, different syntax</td><td>same use cases</td></tr>
+              <tr><td class="fn-col">LPAD(s, n, fill)</td><td class="label">left-pad to length n</td><td>zero-pad integer IDs for display</td></tr>
+              <tr><td class="fn-col">RPAD(s, n, fill)</td><td class="label">right-pad to length n</td><td>align fixed-width output columns</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="wide-card" style="margin-bottom:14px">
+      <div class="wide-card-head"><span class="wide-card-title">NULL handling</span></div>
+      <div class="wide-card-body">
+        <div class="comparison-wrap">
+          <table class="cmp">
+            <thead><tr><th>function</th><th>what it does</th><th>migration use case</th></tr></thead>
+            <tbody>
+              <tr><td class="fn-col">COALESCE(v1, v2, …)</td><td class="label">first non-NULL value</td><td>default value for missing payment_method, notes</td></tr>
+              <tr><td class="fn-col">NULLIF(v, compare)</td><td class="label">returns NULL if v = compare, else v</td><td>convert empty string '' to NULL before COALESCE</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="wide-card" style="margin-bottom:14px">
+      <div class="wide-card-head"><span class="wide-card-title">Pattern matching</span></div>
+      <div class="wide-card-body">
+        <div class="comparison-wrap">
+          <table class="cmp">
+            <thead><tr><th>function / operator</th><th>what it does</th><th>migration use case</th></tr></thead>
+            <tbody>
+              <tr><td class="fn-col">col LIKE 'pattern'</td><td class="label">pattern match, case-sensitive</td><td>filter rows by prefix/suffix</td></tr>
+              <tr><td class="fn-col">col ILIKE 'pattern'</td><td class="label">pattern match, case-insensitive</td><td>case-safe search in WHERE clauses</td></tr>
+              <tr><td class="fn-col">STARTS_WITH(s, prefix)</td><td class="label">true if s starts with prefix</td><td>check status starts with 'comp'</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Golden combo box -->
+    <div class="note-box note-data" style="padding:14px 16px; border-radius:8px; margin-top:4px">
+      <span class="note-icon" style="font-size:16px; margin-top:2px">📌</span>
+      <div>
+        <div style="font-size:13px; font-weight:500; margin-bottom:6px; color:var(--teal)">The golden cleaning combination</div>
+        <code style="font-family:var(--mono); font-size:12px; color:var(--teal)">INITCAP(LOWER(TRIM(column_name)))</code>
+        <div style="margin-top:6px; font-size:12px; line-height:1.55; color:var(--teal)">
+          Apply this to every name column (drivers, riders, cities) before inserting into lookup tables and before matching in WHERE clauses.
+          Handles spaces, mixed case, and leading/trailing whitespace in one expression.
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+</div><!-- /quickref -->
+
+</div><!-- /main -->
+
+<div class="page-footer">
+  Week 2 · SQL String Functions · Pre-class cheat sheet
+</div>
+
+<script>
+function show(id) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  event.currentTarget.classList.add('active');
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function runPlayground() {
+  const input   = document.getElementById('pg-input').value;
+  const pattern = document.getElementById('pg-pattern').value;
+  const replace = document.getElementById('pg-replace').value;
+  const flags   = document.getElementById('pg-flags').value || 'g';
+  const resultEl = document.getElementById('pg-result');
+
+  try {
+    const jsFlags = flags.replace(/[^gi]/g, '');
+    const re = new RegExp(pattern, jsFlags || 'g');
+    const result = input.replace(re, replace);
+    resultEl.innerHTML =
+      '<span style="color:#86EFAC">SQL equivalent: </span>' +
+      '<span style="color:#A5F3FC">REGEXP_REPLACE</span>' +
+      '<span style="color:#E2E8F0">(\'</span>' +
+      '<span style="color:#FCA5A5">' + escHtml(input) + '</span>' +
+      '<span style="color:#E2E8F0">\', \'</span>' +
+      '<span style="color:#FCA5A5">' + escHtml(pattern) + '</span>' +
+      '<span style="color:#E2E8F0">\', \'</span>' +
+      '<span style="color:#FCA5A5">' + escHtml(replace) + '</span>' +
+      '<span style="color:#E2E8F0">\', \'</span>' +
+      '<span style="color:#FDE68A">' + escHtml(flags) + '</span>' +
+      '<span style="color:#E2E8F0">\')</span>\n' +
+      '<span style="color:#9B9891">→  </span>' +
+      '<span style="color:#86EFAC">\'</span>' +
+      '<span style="color:#86EFAC; font-weight:500">' + escHtml(result) + '</span>' +
+      '<span style="color:#86EFAC">\'</span>';
+  } catch(e) {
+    resultEl.innerHTML = '<span style="color:#F87171">Invalid pattern: ' + escHtml(e.message) + '</span>';
+  }
+}
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function setPreset(pattern, replace, flags) {
+  document.getElementById('pg-pattern').value = pattern;
+  document.getElementById('pg-replace').value = replace;
+  document.getElementById('pg-flags').value = flags;
+  runPlayground();
+}
+
+runPlayground();
+</script>
+</body>
+</html>

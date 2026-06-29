@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>How GROUP BY Works — Under the Hood</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Instrument+Sans:wght@400;500;600;700&family=Lora:ital,wght@0,500;1,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:#F5F4EF;--surface:#FFFFFF;--surface2:#EDEBE4;
+    --border:#DBD8CE;--border2:#C8C4B8;
+    --text:#1A1814;--muted:#6B6760;--faint:#9B9891;
+    --teal:#0D6B5E;--teal-bg:#E4F4F0;--teal-bd:#A8D9CF;
+    --blue:#1A4F8A;--blue-bg:#EAF2FB;--blue-bd:#A8C8EE;
+    --amber:#7A4A08;--amber-bg:#FDF3E0;--amber-bd:#F0C97A;
+    --red:#8A2020;--red-bg:#FDEAEA;--red-bd:#F0AAAA;
+    --green:#1E5C1E;--green-bg:#EAF5EA;--green-bd:#9FD59F;
+    --purple:#4A2D9C;--purple-bg:#EEEAFD;--purple-bd:#BFB4F0;
+    --mono:'JetBrains Mono',monospace;--sans:'Instrument Sans',sans-serif;--serif:'Lora',serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:14px;line-height:1.6}
+
+  /* header */
+  .header{background:var(--text);color:#F0EDE6;padding:2.5rem 2rem 2rem;position:relative;overflow:hidden}
+  .header::before{content:'';position:absolute;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 39px,rgba(255,255,255,.03) 39px,rgba(255,255,255,.03) 40px),repeating-linear-gradient(90deg,transparent,transparent 39px,rgba(255,255,255,.03) 39px,rgba(255,255,255,.03) 40px)}
+  .header-inner{position:relative;max-width:880px;margin:0 auto}
+  .eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:#9B9891;margin-bottom:.5rem}
+  .header h1{font-family:var(--serif);font-size:clamp(1.6rem,4vw,2.4rem);font-weight:500;line-height:1.2;margin-bottom:.4rem}
+  .header h1 em{font-style:italic;color:#EF9F27}
+  .header p{font-size:13px;color:#9B9891;max-width:500px;line-height:1.6}
+
+  /* sticky progress */
+  .progress-wrap{background:rgba(245,244,239,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:50;padding:10px 2rem;overflow-x:auto}
+  .progress{display:flex;align-items:center;gap:0;max-width:880px;margin:0 auto}
+  .p-step{display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer;flex-shrink:0;padding:0 4px}
+  .p-circle{width:32px;height:32px;border-radius:50%;border:1.5px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:var(--muted);background:var(--surface);transition:all .2s}
+  .p-step.done .p-circle{background:var(--green-bg);border-color:var(--green-bd);color:var(--green)}
+  .p-step.active .p-circle{background:var(--text);border-color:var(--text);color:var(--bg)}
+  .p-label{font-size:10px;color:var(--faint);text-align:center;white-space:nowrap;line-height:1.2}
+  .p-step.active .p-label{color:var(--text);font-weight:600}
+  .p-line{height:1.5px;width:20px;background:var(--border);flex-shrink:0;margin-bottom:14px}
+  .p-step.done+.p-line{background:var(--green-bd)}
+
+  .main{max-width:880px;margin:0 auto;padding:1.5rem 2rem 4rem}
+
+  /* panels */
+  .panel{display:none}.panel.active{display:block}
+  .badge{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:500;padding:3px 10px;border-radius:20px;border:1px solid;margin-bottom:8px}
+  .ptitle{font-size:17px;font-weight:600;color:var(--text);margin-bottom:4px}
+  .psub{font-size:13px;color:var(--muted);margin-bottom:1.25rem;line-height:1.65;max-width:640px}
+
+  /* tables */
+  .tbl-wrap{overflow-x:auto;margin-bottom:1rem;border:1px solid var(--border);border-radius:8px}
+  table.dt{width:100%;border-collapse:collapse;font-size:11.5px;font-family:var(--mono)}
+  table.dt th{font-family:var(--sans);font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);padding:8px 10px;text-align:left;border-bottom:1px solid var(--border);background:var(--surface2);white-space:nowrap}
+  table.dt td{padding:7px 10px;border-bottom:1px solid #ECEAE4;white-space:nowrap;color:var(--text);vertical-align:top}
+  table.dt tr:last-child td{border-bottom:none}
+  table.dt td.r{color:var(--teal);font-weight:500}
+  table.dt td.s{color:var(--amber);font-weight:500}
+  table.dt td.b{color:var(--blue);font-weight:500}
+  table.dt th.th-key{background:var(--blue-bg);color:var(--blue);border-bottom-color:var(--blue-bd)}
+
+  /* callout */
+  .callout{border-radius:7px;padding:10px 14px;font-size:12.5px;line-height:1.6;display:flex;gap:8px;margin-bottom:.85rem;border:1px solid}
+  .callout.warn{background:var(--amber-bg);border-color:var(--amber-bd);color:var(--amber)}
+  .callout.info{background:var(--blue-bg);border-color:var(--blue-bd);color:var(--blue)}
+  .callout.success{background:var(--green-bg);border-color:var(--green-bd);color:var(--green)}
+  .callout.danger{background:var(--red-bg);border-color:var(--red-bd);color:var(--red)}
+  .callout.neutral{background:var(--surface2);border-color:var(--border);color:var(--muted)}
+  code{font-family:var(--mono);font-size:11px;background:var(--surface2);padding:1px 4px;border-radius:3px}
+
+  /* code chip (terminal) */
+  .code-chip{background:#1A1814;border-radius:8px;overflow:hidden;margin-bottom:1.25rem;box-shadow:0 2px 16px rgba(0,0,0,.14)}
+  .code-chip-head{display:flex;align-items:center;gap:6px;padding:8px 14px;background:rgba(255,255,255,.05);border-bottom:1px solid rgba(255,255,255,.07)}
+  .code-chip-head .dot{width:9px;height:9px;border-radius:50%;flex-shrink:0}
+  .code-chip-head .dot.r{background:#FF5F57}
+  .code-chip-head .dot.y{background:#FEBC2E}
+  .code-chip-head .dot.g{background:#28C840}
+  .code-chip-head .lbl{margin-left:4px;font-size:10px;font-family:var(--mono);color:rgba(255,255,255,.3);letter-spacing:.1em;text-transform:uppercase}
+  .code-chip-body{padding:14px 18px;font-family:var(--mono);font-size:12.5px;line-height:2;color:#D8D4CC;white-space:pre}
+  .kw{color:#7EC8E3}
+  .fn{color:#7CFC98}
+  .hl{color:#EF9F27;font-weight:600}
+
+  /* fix / explanation block */
+  .fix-block{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px 16px;margin-bottom:1rem}
+  .fix-title{font-size:13px;font-weight:600;color:var(--text);margin-bottom:4px;display:flex;align-items:center;gap:8px}
+  .fix-desc{font-size:12.5px;color:var(--muted);line-height:1.6}
+
+  /* dep chain */
+  .dep-chain{display:flex;align-items:center;gap:0;flex-wrap:wrap;margin:8px 0 4px}
+  .dep-node{padding:4px 10px;border-radius:20px;font-size:11px;font-family:var(--mono);border:1px solid;white-space:nowrap}
+  .dep-arrow{font-size:14px;color:var(--faint);padding:0 6px}
+
+  /* hash badge */
+  .hbadge{display:inline-flex;align-items:center;gap:5px;padding:2px 9px;border-radius:20px;font-size:11px;font-weight:600;font-family:var(--mono);border:1px solid}
+  .hdot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+
+  /* buckets */
+  .bucket-row{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:1rem}
+  .bucket{flex:1;min-width:150px;border:1px solid var(--border);border-radius:8px;overflow:hidden}
+  .bucket-head{padding:9px 12px;font-size:12px;font-weight:600;border-bottom:1px solid;display:flex;align-items:center;gap:6px}
+  .bucket-body{padding:8px 12px;display:flex;flex-direction:column;gap:4px}
+  .bucket-item{font-size:11px;font-family:var(--mono);color:var(--muted);padding:3px 0;border-bottom:1px solid #ECEAE4}
+  .bucket-item:last-child{border-bottom:none}
+
+  /* before/after grid */
+  .ba-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:1rem}
+  @media(max-width:520px){.ba-grid{grid-template-columns:1fr}}
+  .ba-card{border:1px solid var(--border);border-radius:8px;overflow:hidden}
+  .ba-hd{padding:8px 12px;font-size:12px;font-weight:600;border-bottom:1px solid}
+  .ba-bd{padding:10px 12px}
+
+  /* deep-dive toggle */
+  .deep-dive{border:1px solid var(--border);border-radius:8px;margin-bottom:1rem;overflow:hidden}
+  .deep-dive summary{padding:10px 14px;font-size:12.5px;font-weight:600;cursor:pointer;color:var(--muted);list-style:none;display:flex;align-items:center;gap:6px;transition:background .15s,color .15s}
+  .deep-dive summary:hover{background:var(--surface2);color:var(--text)}
+  .deep-dive summary::-webkit-details-marker{display:none}
+  .deep-dive summary .chev{transition:transform .2s;font-size:10px}
+  .deep-dive[open] summary{border-bottom:1px solid var(--border)}
+  .deep-dive[open] summary .chev{transform:rotate(90deg)}
+  .deep-dive-body{padding:12px 14px;font-size:12.5px;line-height:1.65;color:var(--muted);background:var(--surface2)}
+  .deep-dive-body ul{margin:6px 0 0;padding-left:18px}
+  .deep-dive-body li{margin-bottom:5px}
+
+  /* summary table row at final step */
+  .verdict-row{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:1rem}
+  .verdict{display:inline-flex;align-items:center;gap:5px;padding:5px 11px;border-radius:6px;font-size:12px;font-weight:600;border:1px solid}
+  .v-pass{background:var(--green-bg);border-color:var(--green-bd);color:var(--green)}
+
+  /* btns */
+  .btn-row{display:flex;gap:8px;margin-top:1.25rem}
+  .nav-btn{padding:8px 20px;font-size:13px;cursor:pointer;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-family:var(--sans);font-weight:500;transition:all .15s}
+  .nav-btn:hover{border-color:var(--border2);background:var(--surface2)}
+  .nav-btn.primary{background:var(--text);color:var(--bg);border-color:var(--text)}
+  .nav-btn.primary:hover{opacity:.85}
+
+  .divider{height:1px;background:var(--border);margin:1.5rem 0}
+  .footer{text-align:center;padding:1.5rem;font-family:var(--mono);font-size:10px;color:var(--faint);border-top:1px solid var(--border)}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-inner">
+    <div class="eyebrow">Week 2 · Interactive walkthrough</div>
+    <h1>How <em>GROUP BY</em> works — under the hood</h1>
+    <p>One query, five internal steps. Watch PostgreSQL hash rows into buckets and collapse them into one aggregate result.</p>
+  </div>
+</div>
+
+<div class="progress-wrap">
+  <div class="progress" id="progress"></div>
+</div>
+
+<div class="main">
+
+<!-- ═══════ STEP 0 — THE QUERY ═══════ -->
+<div class="panel active" id="p0">
+  <span class="badge" style="background:var(--surface2);border-color:var(--border);color:var(--muted)">setup</span>
+  <p class="ptitle">The query we're running</p>
+  <p class="psub">We want to know how many rides each driver completed and their total revenue. Step through to see what PostgreSQL does internally to produce the answer.</p>
+
+  <div class="code-chip">
+    <div class="code-chip-head">
+      <div class="dot r"></div><div class="dot y"></div><div class="dot g"></div>
+      <span class="lbl">psql</span>
+    </div>
+    <div class="code-chip-body"><span class="kw">SELECT</span>   driver_name,
+         <span class="fn">COUNT</span>(*) <span class="kw">AS</span> rides,
+         <span class="fn">SUM</span>(fare_amount) <span class="kw">AS</span> revenue
+<span class="kw">FROM</span>     rides
+<span class="kw">GROUP BY</span> <span class="hl">driver_name</span>
+<span class="kw">ORDER BY</span> revenue <span class="kw">DESC</span>;</div>
+  </div>
+
+  <div class="callout info">
+    <span>💡</span>
+    <span>PostgreSQL processes this in a few internal phases — <strong>FROM</strong> (read rows), <strong>GROUP BY</strong> (hash rows into buckets), <strong>aggregate</strong> (run COUNT/SUM once per bucket), then <strong>ORDER BY</strong> (sort the output). Step through each one.</span>
+  </div>
+</div>
+
+<!-- ═══════ STEP 1 — FROM ═══════ -->
+<div class="panel" id="p1">
+  <span class="badge" style="background:var(--blue-bg);border-color:var(--blue-bd);color:var(--blue)">phase 1 — FROM</span>
+  <p class="ptitle">Read all matching rows from the table</p>
+  <p class="psub">PostgreSQL starts by reading every row from the <code>rides</code> table — raw and unsorted, exactly as they sit on disk. No grouping yet.</p>
+
+  <div class="tbl-wrap">
+    <table class="dt">
+      <tr>
+        <th>driver_name</th>
+        <th>fare_amount</th>
+        <th>status</th>
+      </tr>
+      <tr><td class="r">Ramesh Shrestha</td><td>350.00</td><td>completed</td></tr>
+      <tr><td class="s">Sita Rai</td><td>210.00</td><td>completed</td></tr>
+      <tr><td class="r">Ramesh Shrestha</td><td>480.00</td><td>completed</td></tr>
+      <tr><td class="b">Bikash Thapa</td><td>320.00</td><td>cancelled</td></tr>
+      <tr><td class="s">Sita Rai</td><td>290.00</td><td>completed</td></tr>
+      <tr><td class="r">Ramesh Shrestha</td><td>150.00</td><td>completed</td></tr>
+      <tr><td class="b">Bikash Thapa</td><td>410.00</td><td>completed</td></tr>
+    </table>
+  </div>
+
+  <div class="callout info">
+    <span>ℹ️</span>
+    <span>7 raw rows. Ramesh appears 3 times, Sita twice, Bikash twice — all interleaved in disk order. GROUP BY hasn't happened yet.</span>
+  </div>
+</div>
+
+<!-- ═══════ STEP 2 — HASH ═══════ -->
+<div class="panel" id="p2">
+  <span class="badge" style="background:var(--amber-bg);border-color:var(--amber-bd);color:var(--amber)">phase 2 — group rows by key</span>
+  <p class="ptitle">Route each row into a bucket by hashing the key</p>
+  <p class="psub">As PostgreSQL scans each row, it computes <code>hash(driver_name)</code> and uses that value to find — or create — the matching bucket in memory. This strategy is called a <strong>HashAggregate</strong>. Rows go straight to their bucket — no sorting needed first.</p>
+
+  <div class="tbl-wrap">
+    <table class="dt">
+      <tr>
+        <th>driver_name</th>
+        <th>fare_amount</th>
+        <th>hash(driver_name)</th>
+      </tr>
+      <tr>
+        <td class="r">Ramesh Shrestha</td><td>350.00</td>
+        <td><span class="hbadge" style="background:var(--teal-bg);color:var(--teal);border-color:var(--teal-bd)"><span class="hdot" style="background:var(--teal)"></span>→ bucket R</span></td>
+      </tr>
+      <tr>
+        <td class="s">Sita Rai</td><td>210.00</td>
+        <td><span class="hbadge" style="background:var(--amber-bg);color:var(--amber);border-color:var(--amber-bd)"><span class="hdot" style="background:var(--amber)"></span>→ bucket S</span></td>
+      </tr>
+      <tr>
+        <td class="r">Ramesh Shrestha</td><td>480.00</td>
+        <td><span class="hbadge" style="background:var(--teal-bg);color:var(--teal);border-color:var(--teal-bd)"><span class="hdot" style="background:var(--teal)"></span>→ bucket R</span></td>
+      </tr>
+      <tr>
+        <td class="b">Bikash Thapa</td><td>320.00</td>
+        <td><span class="hbadge" style="background:var(--blue-bg);color:var(--blue);border-color:var(--blue-bd)"><span class="hdot" style="background:var(--blue)"></span>→ bucket B</span></td>
+      </tr>
+      <tr>
+        <td class="s">Sita Rai</td><td>290.00</td>
+        <td><span class="hbadge" style="background:var(--amber-bg);color:var(--amber);border-color:var(--amber-bd)"><span class="hdot" style="background:var(--amber)"></span>→ bucket S</span></td>
+      </tr>
+      <tr>
+        <td class="r">Ramesh Shrestha</td><td>150.00</td>
+        <td><span class="hbadge" style="background:var(--teal-bg);color:var(--teal);border-color:var(--teal-bd)"><span class="hdot" style="background:var(--teal)"></span>→ bucket R</span></td>
+      </tr>
+      <tr>
+        <td class="b">Bikash Thapa</td><td>410.00</td>
+        <td><span class="hbadge" style="background:var(--blue-bg);color:var(--blue);border-color:var(--blue-bd)"><span class="hdot" style="background:var(--blue)"></span>→ bucket B</span></td>
+      </tr>
+    </table>
+  </div>
+
+  <div class="callout warn">
+    <span>🔑</span>
+    <span>The rows are still in their original disk order — Ramesh, Sita, Ramesh, Bikash, Sita, Ramesh, Bikash. PostgreSQL never reordered them. It just computed <code>hash(driver_name)</code> on the fly and dropped each row into its bucket as it scanned past.</span>
+  </div>
+
+  <details class="deep-dive">
+    <summary><span class="chev">▶</span> When does PostgreSQL sort instead of hashing?</summary>
+    <div class="deep-dive-body">
+      HashAggregate is the typical default for a plain GROUP BY, but the planner can choose a <strong>GroupAggregate</strong> (sort-based) plan instead when:
+      <ul>
+        <li>An index already returns rows pre-sorted by the GROUP BY column — sorting is then free, so PostgreSQL just streams matching rows into each group as it scans.</li>
+        <li>The query also needs <code>ORDER BY</code> on the same column(s) — one sort can satisfy both the grouping and the final order.</li>
+        <li>There are so many distinct groups that the hash table would exceed <code>work_mem</code> — sorting and streaming avoids keeping all groups in memory at once.</li>
+      </ul>
+      Check which plan was chosen with <code>EXPLAIN</code> — look for <code>HashAggregate</code> vs <code>GroupAggregate</code> in the output.
+    </div>
+  </details>
+</div>
+
+<!-- ═══════ STEP 3 — BUCKETS ═══════ -->
+<div class="panel" id="p3">
+  <span class="badge" style="background:var(--amber-bg);border-color:var(--amber-bd);color:var(--amber)">phase 3 — buckets are ready</span>
+  <p class="ptitle">Each bucket holds every row for one group</p>
+  <p class="psub">After one pass over the table, PostgreSQL has built three in-memory buckets — one per distinct <code>driver_name</code> hash value. Each bucket holds every row that hashed into it. Aggregate functions run next, once per bucket.</p>
+
+  <div class="bucket-row">
+    <div class="bucket" style="border-color:var(--teal-bd)">
+      <div class="bucket-head" style="background:var(--teal-bg);color:var(--teal);border-bottom-color:var(--teal-bd)">
+        Ramesh Shrestha <span style="font-size:10px;font-weight:400;opacity:.6;margin-left:2px">3 rows</span>
+      </div>
+      <div class="bucket-body">
+        <div class="bucket-item">350.00 · completed</div>
+        <div class="bucket-item">480.00 · completed</div>
+        <div class="bucket-item">150.00 · completed</div>
+      </div>
+    </div>
+    <div class="bucket" style="border-color:var(--blue-bd)">
+      <div class="bucket-head" style="background:var(--blue-bg);color:var(--blue);border-bottom-color:var(--blue-bd)">
+        Bikash Thapa <span style="font-size:10px;font-weight:400;opacity:.6;margin-left:2px">2 rows</span>
+      </div>
+      <div class="bucket-body">
+        <div class="bucket-item">320.00 · cancelled</div>
+        <div class="bucket-item">410.00 · completed</div>
+      </div>
+    </div>
+    <div class="bucket" style="border-color:var(--amber-bd)">
+      <div class="bucket-head" style="background:var(--amber-bg);color:var(--amber);border-bottom-color:var(--amber-bd)">
+        Sita Rai <span style="font-size:10px;font-weight:400;opacity:.6;margin-left:2px">2 rows</span>
+      </div>
+      <div class="bucket-body">
+        <div class="bucket-item">210.00 · completed</div>
+        <div class="bucket-item">290.00 · completed</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="callout info">
+    <span>ℹ️</span>
+    <span>3 buckets for 3 distinct driver names. This is why more distinct values = more output rows. The aggregate functions haven't run yet — buckets just hold the raw rows.</span>
+  </div>
+</div>
+
+<!-- ═══════ STEP 4 — AGGREGATE ═══════ -->
+<div class="panel" id="p4">
+  <span class="badge" style="background:var(--green-bg);border-color:var(--green-bd);color:var(--green)">phase 4 — aggregate each bucket</span>
+  <p class="ptitle">Run aggregate functions once per bucket</p>
+  <p class="psub">PostgreSQL runs <code>COUNT(*)</code> and <code>SUM(fare_amount)</code> on each bucket independently. Every bucket collapses into exactly one output row — this is where many rows become one summary row per group.</p>
+
+  <div class="tbl-wrap">
+    <table class="dt">
+      <tr>
+        <th>driver_name</th>
+        <th>rides (COUNT)</th>
+        <th>revenue (SUM)</th>
+      </tr>
+      <tr>
+        <td class="r">Ramesh Shrestha</td>
+        <td><strong>3</strong></td>
+        <td><strong>980.00</strong></td>
+      </tr>
+      <tr>
+        <td class="b">Bikash Thapa</td>
+        <td><strong>2</strong></td>
+        <td><strong>730.00</strong></td>
+      </tr>
+      <tr>
+        <td class="s">Sita Rai</td>
+        <td><strong>2</strong></td>
+        <td><strong>500.00</strong></td>
+      </tr>
+    </table>
+  </div>
+
+  <div class="callout success">
+    <span>✓</span>
+    <span>7 input rows collapsed to 3 output rows — one per bucket. <code>COUNT(*)</code> counted the rows in each bucket, <code>SUM(fare_amount)</code> added the fares. This is the core mechanic of every aggregate query.</span>
+  </div>
+</div>
+
+<!-- ═══════ STEP 5 — ORDER BY + RESULT ═══════ -->
+<div class="panel" id="p5">
+  <span class="badge" style="background:var(--green-bg);border-color:var(--green-bd);color:var(--green)">phase 5 — ORDER BY</span>
+  <p class="ptitle">Sort the aggregated result</p>
+  <p class="psub"><code>ORDER BY revenue DESC</code> runs last — after aggregation. This is why you can ORDER BY an aggregate like <code>SUM(fare_amount)</code>, but you cannot <code>WHERE</code> on it — WHERE runs before the groups exist.</p>
+
+  <div class="tbl-wrap">
+    <table class="dt">
+      <tr>
+        <th>#</th>
+        <th>driver_name</th>
+        <th>rides</th>
+        <th>revenue ↓</th>
+      </tr>
+      <tr><td style="color:var(--faint)">1</td><td class="r">Ramesh Shrestha</td><td>3</td><td><strong>980.00</strong></td></tr>
+      <tr><td style="color:var(--faint)">2</td><td class="b">Bikash Thapa</td><td>2</td><td><strong>730.00</strong></td></tr>
+      <tr><td style="color:var(--faint)">3</td><td class="s">Sita Rai</td><td>2</td><td><strong>500.00</strong></td></tr>
+    </table>
+  </div>
+
+  <div class="callout success">
+    <span>✓</span>
+    <span>Final result — 3 rows, sorted by revenue descending. Full pipeline: <strong>read rows → hash into buckets → aggregate → sort output.</strong></span>
+  </div>
+
+  <div class="callout danger">
+    <span>⚠️</span>
+    <span><strong>The casing trap:</strong> what if one row had <code>"ramesh shrestha"</code> (lowercase)? <code>hash('ramesh shrestha') ≠ hash('Ramesh Shrestha')</code> — it hashes to a completely different bucket, creating a 4th group regardless of where that row sits in the table. That's exactly why a casing mismatch silently splits one driver into two rows in your output.</span>
+  </div>
+
+  <div class="divider"></div>
+
+  <p style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:8px">The full pipeline — one summary</p>
+
+  <div class="tbl-wrap">
+    <table class="dt" style="font-family:var(--sans);font-size:12px">
+      <tr><th>Phase</th><th>What PostgreSQL does</th><th>Output</th></tr>
+      <tr>
+        <td style="font-weight:600;color:var(--blue)">FROM</td>
+        <td>Read all rows from disk in storage order</td>
+        <td>7 raw rows</td>
+      </tr>
+      <tr>
+        <td style="font-weight:600;color:var(--amber)">HashAggregate</td>
+        <td>Hash each <code>driver_name</code>, drop row into matching bucket</td>
+        <td>3 in-memory buckets</td>
+      </tr>
+      <tr>
+        <td style="font-weight:600;color:var(--green)">Aggregate</td>
+        <td>Run <code>COUNT(*)</code> and <code>SUM()</code> once per bucket</td>
+        <td>3 result rows</td>
+      </tr>
+      <tr>
+        <td style="font-weight:600;color:var(--green)">ORDER BY</td>
+        <td>Sort the 3 result rows by <code>revenue DESC</code></td>
+        <td>Final 3 rows</td>
+      </tr>
+    </table>
+  </div>
+</div>
+
+</div><!-- /main -->
+
+<div class="footer">Week 2 · How GROUP BY works — interactive step-by-step walkthrough</div>
+
+<script>
+  const steps = [
+    {label:'The\nquery'},
+    {label:'FROM'},
+    {label:'Hash\nrows'},
+    {label:'Buckets'},
+    {label:'Aggregate'},
+    {label:'Result'},
+  ];
+  let cur = 0;
+  const total = steps.length;
+  const nav = document.getElementById('progress');
+
+  function render() {
+    nav.innerHTML = '';
+    steps.forEach((s, i) => {
+      const el = document.createElement('div');
+      el.className = 'p-step' + (i === cur ? ' active' : i < cur ? ' done' : '');
+      el.onclick = () => goTo(i);
+      const circle = document.createElement('div');
+      circle.className = 'p-circle';
+      circle.textContent = i < cur ? '✓' : i + 1;
+      const label = document.createElement('div');
+      label.className = 'p-label';
+      label.innerHTML = s.label.replace('\n', '<br>');
+      el.appendChild(circle);
+      el.appendChild(label);
+      nav.appendChild(el);
+      if (i < total - 1) {
+        const line = document.createElement('div');
+        line.className = 'p-line';
+        if (i < cur) line.style.background = 'var(--green-bd)';
+        nav.appendChild(line);
+      }
+    });
+    addBtns();
+  }
+
+  function goTo(n) {
+    if (n < 0 || n >= total) return;
+    document.getElementById('p' + cur).classList.remove('active');
+    cur = n;
+    document.getElementById('p' + cur).classList.add('active');
+    render();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  function addBtns() {
+    document.querySelectorAll('.btn-row').forEach(b => b.remove());
+    const panel = document.getElementById('p' + cur);
+    const row = document.createElement('div');
+    row.className = 'btn-row';
+    if (cur > 0) {
+      const b = document.createElement('button');
+      b.className = 'nav-btn'; b.textContent = '← Back';
+      b.onclick = () => goTo(cur - 1); row.appendChild(b);
+    }
+    if (cur < total - 1) {
+      const b = document.createElement('button');
+      b.className = 'nav-btn primary'; b.textContent = 'Next step →';
+      b.onclick = () => goTo(cur + 1); row.appendChild(b);
+    }
+    panel.appendChild(row);
+  }
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'ArrowRight') goTo(cur + 1);
+    if (e.key === 'ArrowLeft') goTo(cur - 1);
+  });
+
+  render();
+</script>
+</body>
+</html>

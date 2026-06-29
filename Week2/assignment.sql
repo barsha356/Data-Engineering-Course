@@ -1,0 +1,4 @@
+-- week2_queries.sql
+-- Week 2 Assignment
+-- Submit file:
+--    <your_name>week2_schema_normalized.sql  (your CREATE TABLE + INSERT migration)
