@@ -1,0 +1,694 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Normalization — Step by Step Fix</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Instrument+Sans:wght@400;500;600;700&family=Lora:ital,wght@0,500;1,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:#F5F4EF;--surface:#FFFFFF;--surface2:#EDEBE4;
+    --border:#DBD8CE;--border2:#C8C4B8;
+    --text:#1A1814;--muted:#6B6760;--faint:#9B9891;
+    --teal:#0D6B5E;--teal-bg:#E4F4F0;--teal-bd:#A8D9CF;
+    --blue:#1A4F8A;--blue-bg:#EAF2FB;--blue-bd:#A8C8EE;
+    --amber:#7A4A08;--amber-bg:#FDF3E0;--amber-bd:#F0C97A;
+    --red:#8A2020;--red-bg:#FDEAEA;--red-bd:#F0AAAA;
+    --green:#1E5C1E;--green-bg:#EAF5EA;--green-bd:#9FD59F;
+    --purple:#4A2D9C;--purple-bg:#EEEAFD;--purple-bd:#BFB4F0;
+    --mono:'JetBrains Mono',monospace;--sans:'Instrument Sans',sans-serif;--serif:'Lora',serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:14px;line-height:1.6}
+
+  /* header */
+  .header{background:var(--text);color:#F0EDE6;padding:2.5rem 2rem 2rem;position:relative;overflow:hidden}
+  .header::before{content:'';position:absolute;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 39px,rgba(255,255,255,.03) 39px,rgba(255,255,255,.03) 40px),repeating-linear-gradient(90deg,transparent,transparent 39px,rgba(255,255,255,.03) 39px,rgba(255,255,255,.03) 40px)}
+  .header-inner{position:relative;max-width:880px;margin:0 auto}
+  .eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:#9B9891;margin-bottom:.5rem}
+  .header h1{font-family:var(--serif);font-size:clamp(1.6rem,4vw,2.4rem);font-weight:500;line-height:1.2;margin-bottom:.4rem}
+  .header h1 em{font-style:italic;color:#EF9F27}
+  .header p{font-size:13px;color:#9B9891;max-width:500px;line-height:1.6}
+
+  /* progress */
+  .progress-wrap{background:rgba(245,244,239,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:50;padding:10px 2rem;overflow-x:auto}
+  .progress{display:flex;align-items:center;gap:0;max-width:880px;margin:0 auto}
+  .p-step{display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer;flex-shrink:0;padding:0 4px}
+  .p-circle{width:32px;height:32px;border-radius:50%;border:1.5px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:var(--muted);background:var(--surface);transition:all .2s}
+  .p-step.done .p-circle{background:var(--green-bg);border-color:var(--green-bd);color:var(--green)}
+  .p-step.active .p-circle{background:var(--text);border-color:var(--text);color:var(--bg)}
+  .p-label{font-size:10px;color:var(--faint);text-align:center;white-space:nowrap;line-height:1.2}
+  .p-step.active .p-label{color:var(--text);font-weight:600}
+  .p-line{height:1.5px;width:20px;background:var(--border);flex-shrink:0;margin-bottom:14px}
+  .p-step.done+.p-line{background:var(--green-bd)}
+
+  .main{max-width:880px;margin:0 auto;padding:1.5rem 2rem 4rem}
+
+  /* panels */
+  .panel{display:none}.panel.active{display:block}
+  .badge{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:500;padding:3px 10px;border-radius:20px;border:1px solid;margin-bottom:8px}
+  .ptitle{font-size:17px;font-weight:600;color:var(--text);margin-bottom:4px}
+  .psub{font-size:13px;color:var(--muted);margin-bottom:1.25rem;line-height:1.65;max-width:620px}
+
+  /* tables */
+  .tbl-wrap{overflow-x:auto;margin-bottom:1rem;border:1px solid var(--border);border-radius:8px}
+  table.dt{width:100%;border-collapse:collapse;font-size:11.5px;font-family:var(--mono)}
+  table.dt th{font-family:var(--sans);font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);padding:8px 10px;text-align:left;border-bottom:1px solid var(--border);background:var(--surface2);white-space:nowrap}
+  table.dt td{padding:7px 10px;border-bottom:1px solid #ECEAE4;white-space:nowrap;color:var(--text);vertical-align:top}
+  table.dt tr:last-child td{border-bottom:none}
+  table.dt td.bad{background:var(--red-bg);color:var(--red)}
+  table.dt td.warn{background:var(--amber-bg);color:var(--amber)}
+  table.dt td.ok{background:var(--green-bg);color:var(--green)}
+  table.dt th.bad-h{background:var(--red-bg);color:var(--red);border-bottom-color:var(--red-bd)}
+  table.dt th.warn-h{background:var(--amber-bg);color:var(--amber);border-bottom-color:var(--amber-bd)}
+  table.dt th.ok-h{background:var(--green-bg);color:var(--green);border-bottom-color:var(--green-bd)}
+  table.dt th.pk{background:var(--blue-bg);color:var(--blue);border-bottom-color:var(--blue-bd)}
+
+  /* callout */
+  .callout{border-radius:7px;padding:10px 14px;font-size:12.5px;line-height:1.6;display:flex;gap:8px;margin-bottom:.85rem;border:1px solid}
+  .callout.warn{background:var(--amber-bg);border-color:var(--amber-bd);color:var(--amber)}
+  .callout.info{background:var(--blue-bg);border-color:var(--blue-bd);color:var(--blue)}
+  .callout.success{background:var(--green-bg);border-color:var(--green-bd);color:var(--green)}
+  .callout.danger{background:var(--red-bg);border-color:var(--red-bd);color:var(--red)}
+  .callout.neutral{background:var(--surface2);border-color:var(--border);color:var(--muted)}
+  code{font-family:var(--mono);font-size:11px;background:var(--surface2);padding:1px 4px;border-radius:3px}
+
+  /* question box */
+  .qbox{background:var(--surface);border-left:3px solid var(--blue-bd);padding:10px 14px;border-radius:0 7px 7px 0;font-size:13px;color:var(--text);margin-bottom:1rem;font-style:italic;line-height:1.6}
+
+  /* fix step */
+  .fix-block{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px 16px;margin-bottom:1rem}
+  .fix-title{font-size:13px;font-weight:600;color:var(--text);margin-bottom:4px;display:flex;align-items:center;gap:8px}
+  .fix-desc{font-size:12.5px;color:var(--muted);line-height:1.6;margin-bottom:8px}
+
+  /* dep chain */
+  .dep-chain{display:flex;align-items:center;gap:0;flex-wrap:wrap;margin:8px 0}
+  .dep-node{padding:4px 10px;border-radius:20px;font-size:11px;font-family:var(--mono);border:1px solid;white-space:nowrap}
+  .dep-arrow{font-size:14px;color:var(--faint);padding:0 3px}
+
+  /* schema cards */
+  .schema-row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:1rem}
+  .schema-tbl{border:1px solid var(--border);border-radius:8px;overflow:hidden;min-width:140px;flex:1}
+  .schema-hd{padding:7px 12px;font-size:12px;font-weight:600;border-bottom:1px solid}
+  .schema-col{padding:4px 12px;font-size:11px;font-family:var(--mono);border-bottom:1px solid #ECEAE4;display:flex;justify-content:space-between;gap:6px;color:var(--muted)}
+  .schema-col:last-child{border-bottom:none}
+  .col-badge{font-size:9px;font-weight:600;padding:1px 5px;border-radius:3px;flex-shrink:0}
+
+  /* before/after */
+  .ba-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:1rem}
+  @media(max-width:520px){.ba-grid{grid-template-columns:1fr}}
+  .ba-card{border:1px solid var(--border);border-radius:8px;overflow:hidden}
+  .ba-hd{padding:8px 12px;font-size:12px;font-weight:600;border-bottom:1px solid}
+  .ba-bd{padding:10px 12px}
+
+  /* verdict */
+  .verdict-row{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:1rem}
+  .verdict{display:inline-flex;align-items:center;gap:5px;padding:5px 11px;border-radius:6px;font-size:12px;font-weight:600;border:1px solid}
+  .v-pass{background:var(--green-bg);border-color:var(--green-bd);color:var(--green)}
+  .v-fail{background:var(--red-bg);border-color:var(--red-bd);color:var(--red)}
+
+  /* btns */
+  .btn-row{display:flex;gap:8px;margin-top:1.25rem}
+  .nav-btn{padding:8px 20px;font-size:13px;cursor:pointer;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-family:var(--sans);font-weight:500;transition:all .15s}
+  .nav-btn:hover{border-color:var(--border2);background:var(--surface2)}
+  .nav-btn.primary{background:var(--text);color:var(--bg);border-color:var(--text)}
+  .nav-btn.primary:hover{opacity:.85}
+
+  .divider{height:1px;background:var(--border);margin:1.5rem 0}
+  .footer{text-align:center;padding:1.5rem;font-family:var(--mono);font-size:10px;color:var(--faint);border-top:1px solid var(--border)}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-inner">
+    <div class="eyebrow">Week 2 · Interactive exercise</div>
+    <h1>Fix a <em>broken</em> table — 1NF, 2NF, 3NF</h1>
+    <p>One table that violates every normal form. Step through each fix and see the schema get cleaner at each stage.</p>
+  </div>
+</div>
+
+<div class="progress-wrap">
+  <div class="progress" id="progress"></div>
+</div>
+
+<div class="main">
+
+<!-- ═══════ STEP 0 — THE BROKEN TABLE ═══════ -->
+<div class="panel active" id="p0">
+  <span class="badge" style="background:var(--red-bg);border-color:var(--red-bd);color:var(--red)">⚠ starting point</span>
+  <p class="ptitle">Meet the broken table — student_courses</p>
+  <p class="psub">A university database tracks which students take which courses, who teaches them, and grades. Someone crammed everything into one table. It breaks <strong>all three</strong> normal forms.</p>
+
+  <div class="tbl-wrap">
+    <table class="dt">
+      <tr>
+        <th class="pk">student_id</th>
+        <th class="pk">course_id</th>
+        <th class="warn-h">student_name</th>
+        <th class="warn-h">student_city</th>
+        <th class="warn-h">course_name</th>
+        <th class="warn-h">instructor</th>
+        <th class="bad-h">instructor_office</th>
+        <th class="bad-h">grades</th>
+      </tr>
+      <tr>
+        <td>S01</td><td>C01</td>
+        <td class="warn">Ramesh</td><td class="warn">Kathmandu</td>
+        <td class="warn">Database</td><td class="warn">Mr. Sharma</td>
+        <td class="bad">Room 201</td>
+        <td class="bad">midterm:A, final:A+</td>
+      </tr>
+      <tr>
+        <td>S01</td><td>C02</td>
+        <td class="warn">Ramesh</td><td class="warn">Kathmandu</td>
+        <td class="warn">Python</td><td class="warn">Ms. Rai</td>
+        <td class="bad">Room 305</td>
+        <td class="bad">midterm:B, final:B+</td>
+      </tr>
+      <tr>
+        <td>S02</td><td>C01</td>
+        <td class="warn">Sita</td><td class="warn">Pokhara</td>
+        <td class="warn">Database</td><td class="warn">Mr. Sharma</td>
+        <td class="bad">Room 201</td>
+        <td class="bad">midterm:A+, final:A</td>
+      </tr>
+      <tr>
+        <td>S02</td><td>C02</td>
+        <td class="warn">Sita</td><td class="warn">Pokhara</td>
+        <td class="warn">Python</td><td class="warn">Ms. Rai</td>
+        <td class="bad">Room 305</td>
+        <td class="bad">midterm:B, final:A</td>
+      </tr>
+      <tr>
+        <td>S03</td><td>C01</td>
+        <td class="warn">Bikash</td><td class="warn">Dharan</td>
+        <td class="warn">Database</td><td class="warn">Mr. Sharma</td>
+        <td class="bad">Room 201</td>
+        <td class="bad">midterm:C, final:B</td>
+      </tr>
+    </table>
+  </div>
+
+  <p style="font-size:12px;color:var(--muted);margin-bottom:1rem">Primary key: <code>(student_id, course_id)</code> — composite key, because one student can take many courses.</p>
+
+  <div class="callout danger">
+    <span>🔴</span>
+    <span><strong>1NF violation</strong> — The <code>grades</code> column stores multiple values: <code>"midterm:A, final:A+"</code>. That's a comma-separated list in a single cell, not an atomic value.</span>
+  </div>
+  <div class="callout warn">
+    <span>🟡</span>
+    <span><strong>2NF violation</strong> — <code>student_name</code> and <code>student_city</code> depend only on <code>student_id</code>, not on the full <code>(student_id, course_id)</code> key. Same for <code>course_name</code> and <code>instructor</code> — they depend only on <code>course_id</code>. These are partial dependencies.</span>
+  </div>
+  <div class="callout danger">
+    <span>🔴</span>
+    <span><strong>3NF violation</strong> — <code>instructor_office</code> depends on <code>instructor</code>, not on the primary key. Knowing the instructor tells you their office — a transitive dependency.</span>
+  </div>
+
+  <div class="qbox">"Before I show the fix — look at the highlighted cells. Can you spot <em>which</em> columns cause <em>which</em> violation?"</div>
+</div>
+
+<!-- ═══════ STEP 1 — FIX 1NF ═══════ -->
+<div class="panel" id="p1">
+  <span class="badge" style="background:var(--blue-bg);border-color:var(--blue-bd);color:var(--blue)">① first normal form</span>
+  <p class="ptitle">Fix 1NF — primary key + atomic values</p>
+  <p class="psub">1NF has two requirements: the table must have a <strong>primary key</strong>, and every cell must hold exactly <strong>one atomic value</strong>. We handle both — first identify the key, then fix the multi-valued <code>grades</code> column.</p>
+
+  <p style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:8px">Part 1 — identify the primary key</p>
+
+  <div class="fix-block">
+    <div class="fix-title">Ask: which column(s) uniquely identify every row?</div>
+    <div class="fix-desc">A primary key is the <em>minimum</em> set of columns where no two rows ever share the same combination of values. Test each candidate against the actual data — look for duplicates:</div>
+
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
+
+      <div style="flex:1;min-width:150px;border:1px solid var(--red-bd);border-radius:7px;overflow:hidden;font-size:11px">
+        <div style="padding:6px 10px;background:var(--red-bg);color:var(--red);font-weight:600;border-bottom:1px solid var(--red-bd)">✗ student_id alone?</div>
+        <div style="padding:8px 10px">
+          <div style="font-family:var(--mono);display:flex;flex-direction:column;gap:2px;margin-bottom:6px">
+            <div style="background:var(--red-bg);color:var(--red);padding:2px 6px;border-radius:4px">S01 ← appears twice</div>
+            <div style="background:var(--red-bg);color:var(--red);padding:2px 6px;border-radius:4px">S01 ← duplicate</div>
+            <div style="padding:2px 6px;color:var(--muted)">S02</div>
+            <div style="padding:2px 6px;color:var(--muted)">S02</div>
+            <div style="padding:2px 6px;color:var(--muted)">S03</div>
+          </div>
+          <p style="color:var(--red);line-height:1.4">Ramesh takes 2 courses — S01 repeats. Not unique. ✗</p>
+        </div>
+      </div>
+
+      <div style="flex:1;min-width:150px;border:1px solid var(--red-bd);border-radius:7px;overflow:hidden;font-size:11px">
+        <div style="padding:6px 10px;background:var(--red-bg);color:var(--red);font-weight:600;border-bottom:1px solid var(--red-bd)">✗ course_id alone?</div>
+        <div style="padding:8px 10px">
+          <div style="font-family:var(--mono);display:flex;flex-direction:column;gap:2px;margin-bottom:6px">
+            <div style="background:var(--red-bg);color:var(--red);padding:2px 6px;border-radius:4px">C01 ← appears 3×</div>
+            <div style="padding:2px 6px;color:var(--muted)">C02</div>
+            <div style="background:var(--red-bg);color:var(--red);padding:2px 6px;border-radius:4px">C01 ← duplicate</div>
+            <div style="padding:2px 6px;color:var(--muted)">C02</div>
+            <div style="background:var(--red-bg);color:var(--red);padding:2px 6px;border-radius:4px">C01 ← duplicate</div>
+          </div>
+          <p style="color:var(--red);line-height:1.4">3 students take Database — C01 repeats. Not unique. ✗</p>
+        </div>
+      </div>
+
+      <div style="flex:1;min-width:150px;border:1px solid var(--green-bd);border-radius:7px;overflow:hidden;font-size:11px">
+        <div style="padding:6px 10px;background:var(--green-bg);color:var(--green);font-weight:600;border-bottom:1px solid var(--green-bd)">✓ (student_id, course_id)?</div>
+        <div style="padding:8px 10px">
+          <div style="font-family:var(--mono);display:flex;flex-direction:column;gap:2px;margin-bottom:6px">
+            <div style="padding:2px 6px;color:var(--muted)">S01 + C01 — unique</div>
+            <div style="padding:2px 6px;color:var(--muted)">S01 + C02 — unique</div>
+            <div style="padding:2px 6px;color:var(--muted)">S02 + C01 — unique</div>
+            <div style="padding:2px 6px;color:var(--muted)">S02 + C02 — unique</div>
+            <div style="padding:2px 6px;color:var(--muted)">S03 + C01 — unique</div>
+          </div>
+          <p style="color:var(--green);line-height:1.4">Every pair is distinct. This is the primary key — a <strong>composite key</strong>. ✓</p>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="callout neutral">
+    <span>📌</span>
+    <span><strong>Why a composite key?</strong> A composite key signals that this table represents a <em>relationship</em> between two entities — student and course. One student can enroll in many courses; one course can have many students. Neither alone is enough to pinpoint a specific row. You'll see why this matters in the 2NF step.</span>
+  </div>
+
+  <div class="divider"></div>
+
+  <p style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:8px">Part 2 — fix the non-atomic value</p>
+  <p style="font-size:13px;color:var(--muted);margin-bottom:1rem;line-height:1.6">Now the second 1NF rule: every cell must hold exactly one value. The <code>grades</code> column stores <code>"midterm:A, final:A+"</code> — two values crammed into one cell. You can't query a specific exam without string parsing.</p>
+
+  <div class="ba-grid">
+    <div class="ba-card">
+      <div class="ba-hd" style="background:var(--red-bg);color:var(--red);border-bottom-color:var(--red-bd)">✗ Before — multi-valued cell</div>
+      <div class="ba-bd">
+        <div class="tbl-wrap" style="border:none;margin-bottom:0">
+          <table class="dt" style="font-size:11px">
+            <tr><th class="pk">student</th><th class="pk">course</th><th class="bad-h">grades</th></tr>
+            <tr><td>S01</td><td>C01</td><td class="bad">midterm:A, final:A+</td></tr>
+            <tr><td>S01</td><td>C02</td><td class="bad">midterm:B, final:B+</td></tr>
+          </table>
+        </div>
+        <p style="font-size:11px;color:var(--red);margin-top:6px">Can't query "find students who got A in the midterm" without string parsing.</p>
+      </div>
+    </div>
+    <div class="ba-card">
+      <div class="ba-hd" style="background:var(--green-bg);color:var(--green);border-bottom-color:var(--green-bd)">✓ After — separate columns</div>
+      <div class="ba-bd">
+        <div class="tbl-wrap" style="border:none;margin-bottom:0">
+          <table class="dt" style="font-size:11px">
+            <tr><th class="pk">student</th><th class="pk">course</th><th class="ok-h">midterm_grade</th><th class="ok-h">final_grade</th></tr>
+            <tr><td>S01</td><td>C01</td><td class="ok">A</td><td class="ok">A+</td></tr>
+            <tr><td>S01</td><td>C02</td><td class="ok">B</td><td class="ok">B+</td></tr>
+          </table>
+        </div>
+        <p style="font-size:11px;color:var(--green);margin-top:6px">Each grade is its own column — a single atomic value per cell.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="fix-block">
+    <div class="fix-title"><span style="color:var(--blue)">①</span> What we did</div>
+    <div class="fix-desc">Split <code>grades</code> into <code>midterm_grade</code> and <code>final_grade</code> — each holds one value. Now you can write <code>WHERE midterm_grade = 'A'</code> without string manipulation.</div>
+  </div>
+
+  <div class="callout info">
+    <span>💡</span>
+    <span><strong>Alternative approach:</strong> If the number of grade types is dynamic (quizzes, assignments, labs…), a separate <code>grades</code> table with rows like <code>(S01, C01, 'midterm', 'A')</code> would be better. For a fixed two-exam system, two columns is simpler.</span>
+  </div>
+
+  <div class="verdict-row">
+    <div class="verdict v-pass">✓ 1NF fixed</div>
+    <div class="verdict v-fail">✗ 2NF still broken</div>
+    <div class="verdict v-fail">✗ 3NF still broken</div>
+  </div>
+
+  <p class="ptitle" style="font-size:14px;margin-top:1.25rem">Table after 1NF fix</p>
+  <div class="tbl-wrap">
+    <table class="dt" style="font-size:11px">
+      <tr>
+        <th class="pk">student_id</th><th class="pk">course_id</th>
+        <th class="warn-h">student_name</th><th class="warn-h">student_city</th>
+        <th class="warn-h">course_name</th><th class="warn-h">instructor</th>
+        <th class="bad-h">instructor_office</th>
+        <th>midterm_grade</th><th>final_grade</th>
+      </tr>
+      <tr><td>S01</td><td>C01</td><td class="warn">Ramesh</td><td class="warn">Kathmandu</td><td class="warn">Database</td><td class="warn">Mr. Sharma</td><td class="bad">Room 201</td><td>A</td><td>A+</td></tr>
+      <tr><td>S01</td><td>C02</td><td class="warn">Ramesh</td><td class="warn">Kathmandu</td><td class="warn">Python</td><td class="warn">Ms. Rai</td><td class="bad">Room 305</td><td>B</td><td>B+</td></tr>
+      <tr><td>S02</td><td>C01</td><td class="warn">Sita</td><td class="warn">Pokhara</td><td class="warn">Database</td><td class="warn">Mr. Sharma</td><td class="bad">Room 201</td><td>A+</td><td>A</td></tr>
+      <tr><td>S02</td><td>C02</td><td class="warn">Sita</td><td class="warn">Pokhara</td><td class="warn">Python</td><td class="warn">Ms. Rai</td><td class="bad">Room 305</td><td>B</td><td>A</td></tr>
+      <tr><td>S03</td><td>C01</td><td class="warn">Bikash</td><td class="warn">Dharan</td><td class="warn">Database</td><td class="warn">Mr. Sharma</td><td class="bad">Room 201</td><td>C</td><td>B</td></tr>
+    </table>
+  </div>
+  <p style="font-size:12px;color:var(--muted)">✓ grades fixed. But the <span style="color:var(--amber)">yellow</span> and <span style="color:var(--red)">red</span> columns still have dependency problems — let's fix those next.</p>
+</div>
+
+<!-- ═══════ STEP 2 — FIX 2NF ═══════ -->
+<div class="panel" id="p2">
+  <span class="badge" style="background:var(--amber-bg);border-color:var(--amber-bd);color:var(--amber)">② second normal form</span>
+  <p class="ptitle">Fix 2NF — remove partial dependencies</p>
+  <p class="psub">The PK is <code>(student_id, course_id)</code>. But <code>student_name</code> depends only on <code>student_id</code>, and <code>course_name</code> depends only on <code>course_id</code>. They each depend on <strong>part</strong> of the key — not the whole key.</p>
+
+  <p style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:8px">The partial dependencies</p>
+
+  <div class="fix-block" style="border-color:var(--amber-bd)">
+    <div class="fix-title"><span style="color:var(--amber)">Partial dep 1</span> student_id → student_name, student_city</div>
+    <div class="dep-chain">
+      <div class="dep-node" style="background:var(--blue-bg);border-color:var(--blue-bd);color:var(--blue)">student_id (part of PK)</div>
+      <div class="dep-arrow">→</div>
+      <div class="dep-node" style="background:var(--amber-bg);border-color:var(--amber-bd);color:var(--amber)">student_name</div>
+      <div class="dep-node" style="background:var(--amber-bg);border-color:var(--amber-bd);color:var(--amber)">student_city</div>
+    </div>
+    <div class="fix-desc">Ramesh's name and city are the same regardless of which course he's in. They depend on the student, not the enrollment.</div>
+  </div>
+
+  <div class="fix-block" style="border-color:var(--amber-bd)">
+    <div class="fix-title"><span style="color:var(--amber)">Partial dep 2</span> course_id → course_name, instructor</div>
+    <div class="dep-chain">
+      <div class="dep-node" style="background:var(--blue-bg);border-color:var(--blue-bd);color:var(--blue)">course_id (part of PK)</div>
+      <div class="dep-arrow">→</div>
+      <div class="dep-node" style="background:var(--amber-bg);border-color:var(--amber-bd);color:var(--amber)">course_name</div>
+      <div class="dep-node" style="background:var(--amber-bg);border-color:var(--amber-bd);color:var(--amber)">instructor</div>
+    </div>
+    <div class="fix-desc">"Database" is taught by Mr. Sharma regardless of which student is enrolled. These belong to the course, not the enrollment.</div>
+  </div>
+
+  <p style="font-size:13px;font-weight:600;color:var(--text);margin:1.25rem 0 8px">The fix — extract into separate tables</p>
+
+  <div class="schema-row">
+    <div class="schema-tbl">
+      <div class="schema-hd" style="background:var(--teal-bg);color:var(--teal);border-bottom-color:var(--teal-bd)">students <span style="font-size:10px;font-weight:400;opacity:.7">— NEW</span></div>
+      <div class="schema-col"><span style="color:var(--blue);font-weight:500">student_id</span><span class="col-badge" style="background:var(--blue-bg);color:var(--blue)">PK</span></div>
+      <div class="schema-col"><span>student_name</span></div>
+      <div class="schema-col"><span>student_city</span></div>
+    </div>
+    <div class="schema-tbl">
+      <div class="schema-hd" style="background:var(--purple-bg);color:var(--purple);border-bottom-color:var(--purple-bd)">courses <span style="font-size:10px;font-weight:400;opacity:.7">— NEW</span></div>
+      <div class="schema-col"><span style="color:var(--blue);font-weight:500">course_id</span><span class="col-badge" style="background:var(--blue-bg);color:var(--blue)">PK</span></div>
+      <div class="schema-col"><span>course_name</span></div>
+      <div class="schema-col"><span>instructor</span></div>
+      <div class="schema-col" style="color:var(--red)"><span>instructor_office</span><span style="font-size:9px;color:var(--red)">⚠ 3NF issue</span></div>
+    </div>
+    <div class="schema-tbl">
+      <div class="schema-hd" style="background:var(--amber-bg);color:var(--amber);border-bottom-color:var(--amber-bd)">enrollments <span style="font-size:10px;font-weight:400;opacity:.7">— CLEANED</span></div>
+      <div class="schema-col"><span style="color:var(--blue);font-weight:500">student_id</span><span class="col-badge" style="background:var(--amber-bg);color:var(--amber)">PK, FK</span></div>
+      <div class="schema-col"><span style="color:var(--blue);font-weight:500">course_id</span><span class="col-badge" style="background:var(--amber-bg);color:var(--amber)">PK, FK</span></div>
+      <div class="schema-col"><span>midterm_grade</span></div>
+      <div class="schema-col"><span>final_grade</span></div>
+    </div>
+  </div>
+
+  <div class="callout success">
+    <span>✓</span>
+    <span>Ramesh's name now exists in exactly one row in <code>students</code>. "Database" exists once in <code>courses</code>. Enrollments only stores what's genuinely per-enrollment: the grades.</span>
+  </div>
+
+  <div class="verdict-row">
+    <div class="verdict v-pass">✓ 1NF fixed</div>
+    <div class="verdict v-pass">✓ 2NF fixed</div>
+    <div class="verdict v-fail">✗ 3NF still broken — instructor_office in courses</div>
+  </div>
+
+  <div class="callout warn">
+    <span>⚠</span>
+    <span>Look at the <code>courses</code> table. <code>instructor_office</code> depends on <code>instructor</code>, not on <code>course_id</code>. If Mr. Sharma moves offices, we'd have to update every course he teaches. That's a transitive dependency — we'll fix it in the next step.</span>
+  </div>
+</div>
+
+<!-- ═══════ STEP 3 — FIX 3NF ═══════ -->
+<div class="panel" id="p3">
+  <span class="badge" style="background:var(--red-bg);border-color:var(--red-bd);color:var(--red)">③ third normal form</span>
+  <p class="ptitle">Fix 3NF — remove transitive dependencies</p>
+  <p class="psub">In the <code>courses</code> table, <code>instructor_office</code> doesn't depend on <code>course_id</code> — it depends on <code>instructor</code>. That's a transitive dependency: <code>course_id → instructor → instructor_office</code>.</p>
+
+  <div class="fix-block" style="border-color:var(--red-bd)">
+    <div class="fix-title"><span style="color:var(--red)">Transitive dependency</span></div>
+    <div class="dep-chain">
+      <div class="dep-node" style="background:var(--green-bg);border-color:var(--green-bd);color:var(--green)">course_id (PK)</div>
+      <div class="dep-arrow">→</div>
+      <div class="dep-node" style="background:var(--amber-bg);border-color:var(--amber-bd);color:var(--amber)">instructor</div>
+      <div class="dep-arrow">→</div>
+      <div class="dep-node" style="background:var(--red-bg);border-color:var(--red-bd);color:var(--red)">instructor_office</div>
+    </div>
+    <div class="fix-desc">The office belongs to the instructor — not to the course. If Mr. Sharma teaches 5 courses, his office "Room 201" is duplicated 5 times. If he moves to Room 310, you must update 5 rows.</div>
+  </div>
+
+  <p style="font-size:13px;font-weight:600;color:var(--text);margin:1rem 0 8px">The fix — extract instructors into their own table</p>
+
+  <div class="ba-grid">
+    <div class="ba-card">
+      <div class="ba-hd" style="background:var(--red-bg);color:var(--red);border-bottom-color:var(--red-bd)">✗ Before — office inside courses</div>
+      <div class="ba-bd">
+        <div class="tbl-wrap" style="border:none;margin-bottom:0">
+          <table class="dt" style="font-size:11px">
+            <tr><th class="pk">course_id</th><th>course_name</th><th>instructor</th><th class="bad-h">instructor_office</th></tr>
+            <tr><td>C01</td><td>Database</td><td>Mr. Sharma</td><td class="bad">Room 201</td></tr>
+            <tr><td>C02</td><td>Python</td><td>Ms. Rai</td><td class="bad">Room 305</td></tr>
+            <tr><td>C03</td><td>Statistics</td><td>Mr. Sharma</td><td class="bad">Room 201</td></tr>
+          </table>
+        </div>
+        <p style="font-size:11px;color:var(--red);margin-top:6px">"Room 201" repeated for every course Mr. Sharma teaches.</p>
+      </div>
+    </div>
+    <div class="ba-card">
+      <div class="ba-hd" style="background:var(--green-bg);color:var(--green);border-bottom-color:var(--green-bd)">✓ After — separate instructors table</div>
+      <div class="ba-bd">
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <div style="flex:1;min-width:120px">
+            <p style="font-size:10px;font-weight:600;color:var(--teal);margin-bottom:3px;text-transform:uppercase;letter-spacing:.06em">courses</p>
+            <div class="tbl-wrap" style="border:none;margin-bottom:0">
+              <table class="dt" style="font-size:10px">
+                <tr><th class="pk">course_id</th><th>course_name</th><th>instructor_id</th></tr>
+                <tr><td>C01</td><td>Database</td><td style="color:var(--amber)">I01</td></tr>
+                <tr><td>C02</td><td>Python</td><td style="color:var(--amber)">I02</td></tr>
+                <tr><td>C03</td><td>Statistics</td><td style="color:var(--amber)">I01</td></tr>
+              </table>
+            </div>
+          </div>
+          <div style="flex:1;min-width:120px">
+            <p style="font-size:10px;font-weight:600;color:var(--purple);margin-bottom:3px;text-transform:uppercase;letter-spacing:.06em">instructors</p>
+            <div class="tbl-wrap" style="border:none;margin-bottom:0">
+              <table class="dt" style="font-size:10px">
+                <tr><th class="pk">instructor_id</th><th>name</th><th>office</th></tr>
+                <tr><td>I01</td><td>Mr. Sharma</td><td class="ok">Room 201</td></tr>
+                <tr><td>I02</td><td>Ms. Rai</td><td class="ok">Room 305</td></tr>
+              </table>
+            </div>
+          </div>
+        </div>
+        <p style="font-size:11px;color:var(--green);margin-top:6px">Office exists once per instructor — update one row to change it.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="verdict-row">
+    <div class="verdict v-pass">✓ 1NF fixed</div>
+    <div class="verdict v-pass">✓ 2NF fixed</div>
+    <div class="verdict v-pass">✓ 3NF fixed</div>
+  </div>
+
+  <div class="callout success">
+    <span>✓</span>
+    <span>Every non-key column now depends on <em>the key, the whole key, and nothing but the key</em>. No redundancy. No anomalies.</span>
+  </div>
+</div>
+
+<!-- ═══════ STEP 4 — FINAL SCHEMA ═══════ -->
+<div class="panel" id="p4">
+  <span class="badge" style="background:var(--green-bg);border-color:var(--green-bd);color:var(--green)">✓ fully normalized</span>
+  <p class="ptitle">The final schema — 4 clean tables</p>
+  <p class="psub">From one broken table to four clean ones. Each entity has its own table. Each fact exists in exactly one place.</p>
+
+  <div class="schema-row">
+    <div class="schema-tbl">
+      <div class="schema-hd" style="background:var(--teal-bg);color:var(--teal);border-bottom-color:var(--teal-bd)">students</div>
+      <div class="schema-col"><span style="color:var(--teal);font-weight:500">student_id</span><span class="col-badge" style="background:var(--teal-bg);color:var(--teal)">PK</span></div>
+      <div class="schema-col"><span>student_name</span><span style="font-size:9px">TEXT</span></div>
+      <div class="schema-col"><span>student_city</span><span style="font-size:9px">TEXT</span></div>
+    </div>
+    <div class="schema-tbl">
+      <div class="schema-hd" style="background:var(--purple-bg);color:var(--purple);border-bottom-color:var(--purple-bd)">instructors</div>
+      <div class="schema-col"><span style="color:var(--purple);font-weight:500">instructor_id</span><span class="col-badge" style="background:var(--purple-bg);color:var(--purple)">PK</span></div>
+      <div class="schema-col"><span>name</span><span style="font-size:9px">TEXT</span></div>
+      <div class="schema-col"><span>office</span><span style="font-size:9px">TEXT</span></div>
+    </div>
+  </div>
+  <div class="schema-row">
+    <div class="schema-tbl">
+      <div class="schema-hd" style="background:var(--blue-bg);color:var(--blue);border-bottom-color:var(--blue-bd)">courses</div>
+      <div class="schema-col"><span style="color:var(--blue);font-weight:500">course_id</span><span class="col-badge" style="background:var(--blue-bg);color:var(--blue)">PK</span></div>
+      <div class="schema-col"><span>course_name</span><span style="font-size:9px">TEXT</span></div>
+      <div class="schema-col"><span style="color:var(--amber)">instructor_id</span><span class="col-badge" style="background:var(--amber-bg);color:var(--amber)">FK</span></div>
+    </div>
+    <div class="schema-tbl">
+      <div class="schema-hd" style="background:var(--amber-bg);color:var(--amber);border-bottom-color:var(--amber-bd)">enrollments</div>
+      <div class="schema-col"><span style="color:var(--amber);font-weight:500">student_id</span><span class="col-badge" style="background:var(--amber-bg);color:var(--amber)">PK, FK</span></div>
+      <div class="schema-col"><span style="color:var(--amber);font-weight:500">course_id</span><span class="col-badge" style="background:var(--amber-bg);color:var(--amber)">PK, FK</span></div>
+      <div class="schema-col"><span>midterm_grade</span><span style="font-size:9px">CHAR(2)</span></div>
+      <div class="schema-col"><span>final_grade</span><span style="font-size:9px">CHAR(2)</span></div>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <p style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:8px">Test the three anomalies — all gone</p>
+
+  <div class="fix-block" style="border-color:var(--green-bd)">
+    <div class="fix-title"><span style="color:var(--green)">✓ Update</span> — Mr. Sharma moves offices</div>
+    <div class="fix-desc">Change one row in <code>instructors</code>: <code>UPDATE instructors SET office = 'Room 310' WHERE instructor_id = 'I01'</code>. Every course he teaches automatically reflects the new office via JOIN. Zero duplication.</div>
+  </div>
+  <div class="fix-block" style="border-color:var(--green-bd)">
+    <div class="fix-title"><span style="color:var(--green)">✓ Insert</span> — new student with no enrollments yet</div>
+    <div class="fix-desc"><code>INSERT INTO students VALUES ('S04', 'Anita', 'Biratnagar')</code> — done. No enrollment needed. The student exists as an entity independently of any course.</div>
+  </div>
+  <div class="fix-block" style="border-color:var(--green-bd)">
+    <div class="fix-title"><span style="color:var(--green)">✓ Delete</span> — Bikash drops the Database course</div>
+    <div class="fix-desc"><code>DELETE FROM enrollments WHERE student_id = 'S03' AND course_id = 'C01'</code>. Bikash's student record survives. The Database course survives. Only the enrollment link is removed.</div>
+  </div>
+
+  <div class="divider"></div>
+
+  <p style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:8px">The full journey — one summary</p>
+
+  <div class="tbl-wrap">
+    <table class="dt" style="font-size:12px;font-family:var(--sans)">
+      <tr><th>Step</th><th>Problem</th><th>Fix</th><th>Tables after</th></tr>
+      <tr>
+        <td style="font-weight:600;color:var(--blue)">1NF</td>
+        <td><code>grades</code> column has comma-separated values</td>
+        <td>Split into <code>midterm_grade</code> + <code>final_grade</code></td>
+        <td>1 table</td>
+      </tr>
+      <tr>
+        <td style="font-weight:600;color:var(--amber)">2NF</td>
+        <td>student_name depends on student_id only (partial dep)</td>
+        <td>Extract <code>students</code> and <code>courses</code> tables</td>
+        <td>3 tables</td>
+      </tr>
+      <tr>
+        <td style="font-weight:600;color:var(--red)">3NF</td>
+        <td>instructor_office depends on instructor (transitive dep)</td>
+        <td>Extract <code>instructors</code> table</td>
+        <td>4 tables</td>
+      </tr>
+    </table>
+  </div>
+
+  <div class="callout success">
+    <span>🎯</span>
+    <span><strong>The key insight:</strong> each fix follows the same pattern — find columns that don't depend on the full PK, extract the entity they <em>do</em> depend on into its own table, and replace with a foreign key reference. That's all normalization is.</span>
+  </div>
+
+  <div class="qbox">"Now map this back to our rides table. The pattern is the same — driver_name is like instructor, the rides table is like enrollments. What tables would you extract?"</div>
+</div>
+
+<!-- ═══════ STEP 5 — CONNECT BACK TO RIDES ═══════ -->
+<div class="panel" id="p5">
+  <span class="badge" style="background:var(--teal-bg);border-color:var(--teal-bd);color:var(--teal)">→ apply to your project</span>
+  <p class="ptitle">Same pattern — apply to the rides table</p>
+  <p class="psub">The student_courses example was the practice. Your rides table is the real thing. The same dependency analysis, the same extraction pattern.</p>
+
+  <div class="ba-grid">
+    <div class="ba-card">
+      <div class="ba-hd" style="background:var(--surface2);color:var(--text);border-bottom-color:var(--border)">University example</div>
+      <div class="ba-bd" style="font-size:12px;color:var(--muted);line-height:1.6">
+        <p><strong>Entity hidden in the flat table:</strong> instructor</p>
+        <p><strong>Symptom:</strong> instructor_office repeats per course</p>
+        <p><strong>Fix:</strong> extract instructors table, reference via FK</p>
+        <p><strong>Result:</strong> 4 tables (students, instructors, courses, enrollments)</p>
+      </div>
+    </div>
+    <div class="ba-card">
+      <div class="ba-hd" style="background:var(--teal-bg);color:var(--teal);border-bottom-color:var(--teal-bd)">Your rides table</div>
+      <div class="ba-bd" style="font-size:12px;color:var(--muted);line-height:1.6">
+        <p><strong>Entity hidden in the flat table:</strong> driver, rider, location</p>
+        <p><strong>Symptom:</strong> driver_name repeats per ride, casing splits data</p>
+        <p><strong>Fix:</strong> extract drivers, riders, locations — reference via FK</p>
+        <p><strong>Result:</strong> 4 tables (drivers, riders, locations, trips)</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="callout info">
+    <span>💡</span>
+    <span><strong>The pattern is always the same:</strong> find the real-world entity hiding inside the flat table → give it its own table with a primary key → replace the repeated text with a foreign key integer. One table per entity. One row per fact.</span>
+  </div>
+
+  <div class="callout success">
+    <span>🎯</span>
+    <span>On Day 2, you'll actually build the normalized rides schema in PostgreSQL, migrate the data using the string-cleaning functions from the cheat sheet, and write JOINs to query across all four tables.</span>
+  </div>
+</div>
+
+</div><!-- /main -->
+
+<div class="footer">Week 2 · Normalization exercise · 1NF → 2NF → 3NF step by step</div>
+
+<script>
+  const steps = [
+    {label:'Broken\ntable'},
+    {label:'Fix\n1NF'},
+    {label:'Fix\n2NF'},
+    {label:'Fix\n3NF'},
+    {label:'Final\nschema'},
+    {label:'Apply to\nrides'},
+  ];
+  let cur = 0;
+  const total = steps.length;
+  const nav = document.getElementById('progress');
+
+  function render() {
+    nav.innerHTML = '';
+    steps.forEach((s, i) => {
+      const el = document.createElement('div');
+      el.className = 'p-step' + (i === cur ? ' active' : i < cur ? ' done' : '');
+      el.onclick = () => goTo(i);
+      const circle = document.createElement('div');
+      circle.className = 'p-circle';
+      circle.textContent = i < cur ? '✓' : i + 1;
+      const label = document.createElement('div');
+      label.className = 'p-label';
+      label.innerHTML = s.label.replace('\n','<br>');
+      el.appendChild(circle);
+      el.appendChild(label);
+      nav.appendChild(el);
+      if (i < total - 1) {
+        const line = document.createElement('div');
+        line.className = 'p-line';
+        if (i < cur) line.style.background = 'var(--green-bd)';
+        nav.appendChild(line);
+      }
+    });
+    addBtns();
+  }
+
+  function goTo(n) {
+    document.getElementById('p'+cur).classList.remove('active');
+    cur = n;
+    document.getElementById('p'+cur).classList.add('active');
+    render();
+    window.scrollTo({top:0,behavior:'smooth'});
+  }
+
+  function addBtns() {
+    document.querySelectorAll('.btn-row').forEach(b => b.remove());
+    const panel = document.getElementById('p'+cur);
+    const row = document.createElement('div');
+    row.className = 'btn-row';
+    if (cur > 0) {
+      const b = document.createElement('button');
+      b.className = 'nav-btn'; b.textContent = '← Back';
+      b.onclick = () => goTo(cur - 1); row.appendChild(b);
+    }
+    if (cur < total - 1) {
+      const b = document.createElement('button');
+      b.className = 'nav-btn primary'; b.textContent = 'Next step →';
+      b.onclick = () => goTo(cur + 1); row.appendChild(b);
+    }
+    panel.appendChild(row);
+  }
+
+  render();
+</script>
+</body>
+</html>
