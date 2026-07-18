@@ -14,11 +14,11 @@ logger = logging.getLogger(__name__)
 load_dotenv()
 
 SOURCE_DB_CONFIG = dict(
-    host=    os.getenv("DB_HOST"),
-    port =   os.getenv("DB_PORT"),
-    dbname = os.getenv("DB_NAME"),
-    user=    os.getenv("DB_USER"),
-    password=os.getenv("DB_PASSWORD")
+    host=    os.getenv("SRC_DB_HOST"),
+    port =   os.getenv("SRC_DB_PORT"),
+    dbname = os.getenv("SRC_DB_NAME"),
+    user=    os.getenv("SRC_DB_USER"),
+    password=os.getenv("SRC_DB_PASSWORD")
 )
 DEST_DB_CONFIG = dict(
     host=    os.getenv("DEST_DB_HOST"),
@@ -278,6 +278,7 @@ def extract_trips(conn):
         tc.cancelled_by          -- from trip_cancellations (NULL for non-cancelled)
     FROM  trips t
     LEFT JOIN trip_cancellations tc ON t.trip_id = tc.trip_id
+    WHERE t.requested_at > %(watermark)s
     ORDER BY t.requested_at
         """
     return extract(conn,extract_trip_sql)
@@ -304,7 +305,6 @@ def load_lookup_dim(conn):
         curr.execute("SELECT date_key FROM dim_date")
         lookup["date"] = {r[0]: True for r in curr.fetchall()}
     return lookup
-
 
 def transform(oltp_row, lookups):
     fact_rows = []
@@ -441,7 +441,6 @@ def load_fact_trips(conn, fact_data):
         conn.rollback()
         logger.error(str(e))
         raise
-
 
 def main():
     """
